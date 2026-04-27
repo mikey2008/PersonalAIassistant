@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Startup Page -->
+    <div id="startup-page" class="startup-container">
+        <div class="startup-content">
+            <img src="baymax.png" alt="Baymax" class="startup-avatar">
+            <h1 class="startup-name">Baymax</h1>
+            <button id="start-chat-btn" class="start-btn">Start Chat</button>
+        </div>
+    </div>
+
+    <div class="layout-wrapper" id="main-layout" style="display: none;">
+        <!-- Sidebar -->
+        <nav class="sidebar" id="sidebar">
+            <button id="new-chat-btn" class="new-chat-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                New Chat
+            </button>
+            <div class="chat-list-container">
+                <ul id="chat-list" class="chat-list">
+                    <!-- Chat items will be injected here -->
+                </ul>
+            </div>
+        </nav>
+
+        <div class="app-container" id="app-container">
+            <!-- Header -->
+            <header class="chat-header">
+                <button id="toggle-sidebar-btn" class="icon-btn toggle-sidebar-btn" aria-label="Toggle Sidebar">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                <h1>AI Assistant</h1>
+            </header>
+
+        <!-- Chat Messages Container -->
+        <main class="chat-container" id="chat-box">
+            <div class="message bot-message">
+                <div class="avatar"><img src="baymax.png" alt="Bot Avatar"></div>
+                <div class="message-content">
+                    Hello! How can I help you today?
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            <div class="input-wrapper">
+                <button id="mic-button" class="icon-btn mic-btn" aria-label="Microphone">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <line x1="12" x2="12" y1="19" y2="22"/>
+                    </svg>
+                </button>
+                <input id="message-input" type="text" placeholder="Message AI Assistant..." class="message-input" autocomplete="off">
+                <button id="send-button" class="icon-btn send-btn" aria-label="Send message">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" x2="11" y1="2" y2="13"/>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="footer-text">
+                AI can make mistakes. Consider verifying important information.
+            </div>
+        </footer>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
