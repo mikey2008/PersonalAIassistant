@@ -160,7 +160,11 @@ else:
 # ========================
 # DATABASE
 # ========================
-DATABASE = os.path.join(app.instance_path, 'database.db')
+# Database Setup - Use /tmp on Vercel as root is read-only
+if os.environ.get('VERCEL'):
+    DATABASE = '/tmp/database.db'
+else:
+    DATABASE = os.path.join(app.instance_path, 'database.db')
 MAX_HISTORY_LENGTH = 16
 
 def get_db():
