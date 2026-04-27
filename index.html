@@ -7,8 +7,59 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- Authentication Page -->
+    <div id="auth-page" class="startup-container" style="display: none;">
+        <div class="auth-box">
+            <h1 class="startup-name" style="margin-bottom: 20px;">Welcome to JARVIS</h1>
+            
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form">
+                <h2>Login</h2>
+                <input type="email" id="login-email" placeholder="Email" required class="auth-input">
+                <input type="password" id="login-password" placeholder="Password" required class="auth-input">
+                <button type="submit" class="start-btn auth-btn">Login</button>
+                <button type="button" id="guest-login-btn" class="start-btn auth-btn" style="background-color: transparent; border: 1px solid var(--text-primary); color: var(--text-primary); margin-top: 10px;">Login as Guest</button>
+                <div class="auth-links">
+                    <a href="#" id="show-register">Create Account</a>
+                    <a href="#" id="show-forgot-password">Forgot Password?</a>
+                </div>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form" style="display: none;">
+                <h2>Create Account</h2>
+                <input type="email" id="register-email" placeholder="Email" required class="auth-input">
+                <input type="password" id="register-password" placeholder="Password (min 6 chars)" required class="auth-input" minlength="6">
+                <button type="submit" class="start-btn auth-btn">Register</button>
+                <div class="auth-links">
+                    <a href="#" id="show-login">Back to Login</a>
+                </div>
+            </form>
+
+            <!-- Forgot Password Form -->
+            <form id="forgot-password-form" class="auth-form" style="display: none;">
+                <h2>Reset Password</h2>
+                <p style="font-size: 14px; margin-bottom: 15px;">Enter your email to receive a reset link.</p>
+                <input type="email" id="forgot-email" placeholder="Email" required class="auth-input">
+                <button type="submit" class="start-btn auth-btn">Send Reset Link</button>
+                <div class="auth-links">
+                    <a href="#" id="show-login-from-forgot">Back to Login</a>
+                </div>
+            </form>
+
+            <!-- Reset Password Form (Shown via JS when token is present) -->
+            <form id="reset-password-form" class="auth-form" style="display: none;">
+                <h2>New Password</h2>
+                <input type="password" id="reset-password" placeholder="New Password (min 6 chars)" required class="auth-input" minlength="6">
+                <button type="submit" class="start-btn auth-btn">Update Password</button>
+            </form>
+            
+            <div id="auth-message" style="margin-top: 15px; font-size: 14px; text-align: center;"></div>
+        </div>
+    </div>
+
     <!-- Startup Page -->
-    <div id="startup-page" class="startup-container">
+    <div id="startup-page" class="startup-container" style="display: none;">
         <div class="startup-content">
             <img src="baymax.png" alt="Baymax" class="startup-avatar">
             <h1 class="startup-name">Baymax</h1>
@@ -37,6 +88,9 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
                 <h1>AI Assistant</h1>
+                <button id="logout-btn" class="icon-btn" aria-label="Logout" style="margin-left: auto;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                </button>
             </header>
 
         <!-- Chat Messages Container -->

@@ -7,12 +7,12 @@ A minimal, human-like AI chatbot powered by **Google Gemini**, built with a Pyth
 ## ✨ Features
 
 - 💬 **Human-like responses** — Short, friendly, emotionally aware replies via Gemini 2.5 Flash
-- 🧠 **Long-term memory** — Conversations saved to a local SQLite database
+- 🧠 **Multi-User Memory** — Conversations securely isolated and saved to a local SQLite database
+- 🔐 **Authentication System** — Secure login, registration, guest access, and password resets
+- 🛡️ **Production-Ready Security** — Rate limiting, HttpOnly session cookies, input sanitization, and security headers
 - 📂 **Chat history sidebar** — Browse, switch, and resume past conversations
 - 🎤 **Voice input** — Speak your message using the Web Speech API
-- 🔊 **Voice output** — AI speaks its responses back (on voice-triggered messages)
-- 🎙️ **Mic toggle** — Click again to stop listening
-- 🛡️ **Secure** — API keys only on the server, never in the frontend
+- 🔊 **Voice output** — AI speaks its responses back
 - 🌙 **Dark mode UI** — Minimalist, centered design inspired by ChatGPT & Gemini
 
 ---
@@ -85,10 +85,12 @@ JARVIS/
 
 ## 🔒 Security
 
+- **Authentication:** Passwords are securely hashed via `pbkdf2:sha256`.
+- **Sessions:** Handled strictly via server-side HttpOnly cookies with `SameSite=Strict`.
+- **Rate Limiting:** Protects endpoints from brute-forcing and API abuse.
 - The `GEMINI_API_KEY` is stored **only** in `.env` (never in frontend code)
-- `.env` and `database.db` are listed in `.gitignore` and will never be committed
-- All user inputs are validated and sanitized on the server
-- The system prompt is fully hidden from users and is injection-resistant
+- `.env` and `instance/database.db` are listed in `.gitignore` and will never be committed
+- All user inputs are strictly validated and sanitized (XSS/SQLi prevention)
 
 ---
 
@@ -96,7 +98,7 @@ JARVIS/
 
 | Layer | Technology |
 |---|---|
-| Backend | Python, Flask, Flask-CORS |
+| Backend | Python, Flask, Flask-CORS, Flask-Limiter, Waitress |
 | AI Model | Google Gemini 2.5 Flash |
 | Database | SQLite (built-in Python) |
 | Frontend | Vanilla HTML, CSS, JavaScript |

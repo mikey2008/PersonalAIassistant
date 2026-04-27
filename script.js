@@ -10,24 +10,213 @@ const chatList = document.getElementById('chat-list');
 const startupPage = document.getElementById('startup-page');
 const mainLayout = document.getElementById('main-layout');
 const startChatBtn = document.getElementById('start-chat-btn');
+const logoutBtn = document.getElementById('logout-btn');
 
-// Variables
-const backendURL = 'http://localhost:5000/chat';
+// Auth DOM Elements
+const authPage = document.getElementById('auth-page');
+const loginForm = document.getElementById('login-form');
+const registerForm = document.getElementById('register-form');
+const forgotPasswordForm = document.getElementById('forgot-password-form');
+const resetPasswordForm = document.getElementById('reset-password-form');
+const authMessage = document.getElementById('auth-message');
+
+// API Config
+const CLIENT_API_KEY = 'jarvis-local-secret-2024';
+const baseURL = 'http://localhost:5000';
+
+const authHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${CLIENT_API_KEY}`
+};
+const fetchOptions = {
+    headers: authHeaders,
+    credentials: 'include'
+};
+
 let currentChatId = null;
+
+// --- 0. INITIALIZATION & AUTH FLOW ---
+
+async function checkSession() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const resetToken = urlParams.get('token');
+
+        if (resetToken) {
+            authPage.style.display = 'flex';
+            loginForm.style.display = 'none';
+            resetPasswordForm.style.display = 'block';
+            return;
+        }
+
+        const res = await fetch(`${baseURL}/session-status`, fetchOptions);
+        const data = await res.json();
+        
+        if (data.authenticated) {
+            authPage.style.display = 'none';
+            startupPage.style.display = 'flex';
+        } else {
+            authPage.style.display = 'flex';
+            startupPage.style.display = 'none';
+        }
+    } catch (e) {
+        console.error("Session check failed", e);
+        authPage.style.display = 'flex';
+    }
+}
+
+function showAuthMessage(msg, isError=false) {
+    authMessage.textContent = msg;
+    authMessage.style.color = isError ? '#ff4444' : '#4CAF50';
+}
+
+function switchForm(hideId, showId) {
+    document.getElementById(hideId).style.display = 'none';
+    document.getElementById(showId).style.display = 'block';
+    authMessage.textContent = '';
+}
+
+// Form Toggles
+document.getElementById('show-register')?.addEventListener('click', (e) => { e.preventDefault(); switchForm('login-form', 'register-form'); });
+document.getElementById('show-login')?.addEventListener('click', (e) => { e.preventDefault(); switchForm('register-form', 'login-form'); });
+document.getElementById('show-forgot-password')?.addEventListener('click', (e) => { e.preventDefault(); switchForm('login-form', 'forgot-password-form'); });
+document.getElementById('show-login-from-forgot')?.addEventListener('click', (e) => { e.preventDefault(); switchForm('forgot-password-form', 'login-form'); });
+// Guest Login
+const guestLoginBtn = document.getElementById('guest-login-btn');
+guestLoginBtn?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+        const res = await fetch(`${baseURL}/auth/guest-login`, {
+            method: 'POST',
+            headers: authHeaders,
+            credentials: 'include'
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        authPage.style.display = 'none';
+        startupPage.style.display = 'flex';
+    } catch (err) {
+        showAuthMessage(err.message, true);
+    }
+});
+
+// Login
+loginForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    try {
+        const res = await fetch(`${baseURL}/auth/login`, {
+            method: 'POST',
+            headers: authHeaders,
+            credentials: 'include',
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        authPage.style.display = 'none';
+        startupPage.style.display = 'flex';
+        loginForm.reset();
+    } catch (err) {
+        showAuthMessage(err.message, true);
+    }
+});
+
+// Register
+registerForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('register-email').value;
+    const password = document.getElementById('register-password').value;
+    try {
+        const res = await fetch(`${baseURL}/auth/register`, {
+            method: 'POST',
+            headers: authHeaders,
+            credentials: 'include',
+            body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showAuthMessage(data.message);
+        registerForm.reset();
+    } catch (err) {
+        showAuthMessage(err.message, true);
+    }
+});
+
+// Forgot Password
+forgotPasswordForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgot-email').value;
+    try {
+        const res = await fetch(`${baseURL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: authHeaders,
+            credentials: 'include',
+            body: JSON.stringify({ email })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showAuthMessage(data.message);
+        forgotPasswordForm.reset();
+    } catch (err) {
+        showAuthMessage(err.message, true);
+    }
+});
+
+// Reset Password
+resetPasswordForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = document.getElementById('reset-password').value;
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    try {
+        const res = await fetch(`${baseURL}/auth/reset-password/${token}`, {
+            method: 'POST',
+            headers: authHeaders,
+            credentials: 'include',
+            body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showAuthMessage(data.message);
+        resetPasswordForm.reset();
+        setTimeout(() => {
+            window.location.href = window.location.pathname; // Remove token from URL
+        }, 2000);
+    } catch (err) {
+        showAuthMessage(err.message, true);
+    }
+});
+
+// Logout
+logoutBtn?.addEventListener('click', async () => {
+    try {
+        await fetch(`${baseURL}/auth/logout`, { method: 'POST', headers: authHeaders, credentials: 'include' });
+        mainLayout.style.display = 'none';
+        authPage.style.display = 'flex';
+        chatBox.innerHTML = '';
+        currentChatId = null;
+    } catch (err) {
+        console.error("Logout failed", err);
+    }
+});
+
+// Initialize
+checkSession();
+
 
 // --- 1. SIDEBAR & MEMORY LOGIC ---
 
-// Toggle sidebar
 if (toggleSidebarBtn) {
     toggleSidebarBtn.addEventListener('click', () => {
         sidebar.classList.toggle('closed');
     });
 }
 
-// Load sidebar chats
 async function loadSidebarChats() {
     try {
-        const res = await fetch('http://localhost:5000/chats');
+        const res = await fetch(`${baseURL}/chats`, fetchOptions);
+        if(res.status === 401) { window.location.reload(); return; } // Session expired
         const chats = await res.json();
         chatList.innerHTML = '';
         chats.forEach(chat => {
@@ -42,14 +231,14 @@ async function loadSidebarChats() {
     }
 }
 
-// Load a specific chat history
 async function loadChatHistory(chatId) {
     try {
         currentChatId = chatId;
-        const res = await fetch(`http://localhost:5000/chats/${chatId}`);
+        const res = await fetch(`${baseURL}/chats/${chatId}`, fetchOptions);
+        if(res.status === 401) { window.location.reload(); return; }
         const messages = await res.json();
         
-        chatBox.innerHTML = ''; // Clear current screen
+        chatBox.innerHTML = '';
         
         if (messages.length === 0) {
             addMessageToUI("Hello! How can I help you today?", "bot");
@@ -59,20 +248,20 @@ async function loadChatHistory(chatId) {
             });
         }
         
-        loadSidebarChats(); // Refresh active styling
+        loadSidebarChats();
     } catch (e) {
         console.error("Failed to load chat history", e);
     }
 }
 
-// Create new chat
 async function createNewChat() {
     try {
-        const res = await fetch('http://localhost:5000/chats/new', { method: 'POST' });
+        const res = await fetch(`${baseURL}/chats/new`, { method: 'POST', ...fetchOptions });
+        if(res.status === 401) { window.location.reload(); return; }
         const data = await res.json();
         currentChatId = data.chat_id;
         
-        chatBox.innerHTML = ''; // Clear current chat
+        chatBox.innerHTML = '';
         addMessageToUI("Hello! How can I help you today?", "bot");
         loadSidebarChats();
     } catch (e) {
@@ -84,7 +273,6 @@ if (newChatBtn) {
     newChatBtn.addEventListener('click', createNewChat);
 }
 
-
 // --- 2. SEND MESSAGE ---
 async function sendMessage(isVoice = false) {
     if (!currentChatId) {
@@ -95,36 +283,25 @@ async function sendMessage(isVoice = false) {
     const text = messageInput.value.trim();
     if (text === '') return;
 
-    // Display user message instantly
     addMessageToUI(text, 'user');
     messageInput.value = '';
 
-    // Show typing indicator
     const typingId = showTypingIndicator();
 
     try {
-        // Call backend API
-        const response = await fetch(backendURL, {
+        const response = await fetch(`${baseURL}/chat`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            ...fetchOptions,
             body: JSON.stringify({ message: text, chat_id: currentChatId })
         });
-
+        
+        if(response.status === 401) { window.location.reload(); return; }
         const data = await response.json();
 
-        // Remove typing indicator when response arrives
         removeElement(typingId);
-
-        // --- 3. HANDLE RESPONSE ---
-        // Display bot reply
         addMessageToUI(data.reply, 'bot');
-        
-        // Refresh sidebar to update titles if this was the first message
         loadSidebarChats();
 
-        // Speak bot response automatically only if input was voice
         if (isVoice === true) {
             speakText(data.reply);
         }
@@ -136,14 +313,12 @@ async function sendMessage(isVoice = false) {
     }
 }
 
-// Helper to prevent XSS when inserting HTML
 function escapeHTML(str) {
     const p = document.createElement("p");
     p.appendChild(document.createTextNode(str));
     return p.innerHTML;
 }
 
-// Add message to the chat interface dynamically
 function addMessageToUI(text, sender) {
     const messageElement = document.createElement('div');
     messageElement.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
@@ -155,17 +330,14 @@ function addMessageToUI(text, sender) {
     innerHTML += `<div class="message-content">${escapeHTML(text)}</div>`;
     
     messageElement.innerHTML = innerHTML;
-    
     chatBox.appendChild(messageElement);
     
-    // Auto-scroll to latest message smoothly
     chatBox.scrollTo({
         top: chatBox.scrollHeight,
         behavior: 'smooth'
     });
 }
 
-// --- 4. TYPING INDICATOR ---
 function showTypingIndicator() {
     const typingElement = document.createElement('div');
     const uniqueId = 'typing-' + Date.now();
@@ -177,14 +349,11 @@ function showTypingIndicator() {
     `;
     
     chatBox.appendChild(typingElement);
-    
-    // Smooth scroll down to show the indicator
     chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
     
     return uniqueId;
 }
 
-// Helper to remove an element by ID
 function removeElement(id) {
     const element = document.getElementById(id);
     if (element) {
@@ -193,22 +362,17 @@ function removeElement(id) {
 }
 
 // --- VOICE FEATURES ---
-
-// 🎤 VOICE INPUT: Web Speech API
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition;
 let isListening = false;
 
 if (SpeechRecognition) {
     recognition = new SpeechRecognition();
-    recognition.continuous = false; // Stop listening automatically when user stops speaking
+    recognition.continuous = false;
     
     recognition.onresult = function(event) {
-        // Convert speech to text
         const transcript = event.results[0][0].transcript;
         messageInput.value = transcript;
-        
-        // Auto-send message
         sendMessage(true);
     };
 
@@ -237,7 +401,7 @@ if (SpeechRecognition) {
                 }
             }, 3000);
         } else if (event.error === 'network') {
-            alert("Network Error: Your browser couldn't connect to its speech recognition servers. This is often caused by a VPN, firewall, or using a browser without built-in speech services.");
+            alert("Network Error: browser speech services offline.");
             messageInput.placeholder = "Message AI Assistant...";
         } else {
             alert("Microphone error: " + event.error);
@@ -246,20 +410,17 @@ if (SpeechRecognition) {
     };
 }
 
-// Start listening on mic click
 if (micButton) {
     micButton.addEventListener('click', () => {
-        // Stop any ongoing AI speech when the user starts the mic
         if ('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
         }
-        
         if (recognition) {
             if (isListening) {
-                recognition.stop(); // Stop if already listening
+                recognition.stop();
             } else {
                 try {
-                    recognition.start(); // Start if not listening
+                    recognition.start();
                 } catch(e) {
                     console.log("Recognition already started.");
                 }
@@ -270,18 +431,14 @@ if (micButton) {
     });
 }
 
-// 🔊 VOICE OUTPUT: speechSynthesis
 function speakText(text) {
     if ('speechSynthesis' in window) {
-        // Cancel any currently playing speech before starting new one
         window.speechSynthesis.cancel();
-        
         const speech = new SpeechSynthesisUtterance(text);
         speech.lang = 'en-US';
         speech.volume = 1;
         speech.rate = 1;
         speech.pitch = 1;
-        
         window.speechSynthesis.speak(speech);
     } else {
         console.warn("Text-to-speech is not supported in your browser.");
@@ -289,13 +446,10 @@ function speakText(text) {
 }
 
 // --- EVENT LISTENERS ---
-
-// Send on button click
 if (sendButton) {
     sendButton.addEventListener('click', () => sendMessage(false));
 }
 
-// Send on 'Enter' key press
 if (messageInput) {
     messageInput.addEventListener('keypress', function(event) {
         if (event.key === 'Enter') {
@@ -305,20 +459,16 @@ if (messageInput) {
 }
 
 // --- STARTUP PAGE LOGIC ---
-
 if (startChatBtn && startupPage && mainLayout) {
     startChatBtn.addEventListener('click', async () => {
-        // Hide the startup page with a fade out effect
         startupPage.style.opacity = '0';
         startupPage.style.transition = 'opacity 0.5s ease';
         
-        // Ensure a chat exists
         await createNewChat();
         
         setTimeout(() => {
             startupPage.style.display = 'none';
-            // Show the main app layout
             mainLayout.style.display = 'flex';
-        }, 500); // Wait for the fade out to finish
+        }, 500);
     });
 }

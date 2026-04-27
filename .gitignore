@@ -24,3 +24,7 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+
+# Protected Flask instance folder (contains DB)
+instance/
