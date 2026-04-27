@@ -176,7 +176,9 @@ def get_db():
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
         db.row_factory = sqlite3.Row
-        db.execute("PRAGMA journal_mode=WAL")
+        # Disable WAL on Vercel as /tmp doesn't always support it
+        if not os.environ.get('VERCEL'):
+            db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA foreign_keys=ON")
     return db
 
