@@ -427,22 +427,25 @@ def logout():
 def auto_guest_session(f):
     """If no session exists, automatically create a guest user so the app works without login."""
     @wraps(f)
+    @wraps(f)
     def decorated(*args, **kwargs):
-        if 'user_id' not in session:
-            # Auto-create a guest account and log them in silently
-            db = get_db()
-            cursor = db.cursor()
-            guest_email = f"guest_{secrets.token_hex(8)}@local"
-            pw_hash = generate_password_hash(secrets.token_urlsafe(16))
-            cursor.execute(
-                "INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)",
-                (guest_email, pw_hash)
-            )
+        db = get_db()
+        cursor = db.cursor()
+        
+        # If user_id exists in session, verify they still exist in the DB (Vercel resets DB often)
+        user_exists = False
+        if 'user_id' in session:
+            cursor.execute("SELECT id FROM users WHERE id = ?", (session['user_id'],))
+            if cursor.fetchone():
+                user_exists = True
+        
+        if not user_exists:
+            cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, ?)", 
+                           (f"guest_{secrets.token_hex(4)}@local", "guest", 1))
             db.commit()
             session['user_id'] = cursor.lastrowid
-            session['is_guest'] = True
             session.permanent = True
-            log_security(logging.INFO, f"Auto guest session created: user_id={session['user_id']}")
+            
         return f(*args, **kwargs)
     return decorated
 
