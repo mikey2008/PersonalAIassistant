@@ -27,9 +27,10 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'   # 'Lax' allows cross-origin requests in dev (http://localhost)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 
-# Ensure instance/ and logs/ directories exist
-os.makedirs(app.instance_path, exist_ok=True)
-os.makedirs('logs', exist_ok=True)
+# Ensure instance/ and logs/ directories exist (Skip on Vercel as root is read-only)
+if not os.environ.get('VERCEL'):
+    os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs('logs', exist_ok=True)
 
 # ========================
 # SECURITY: HTTPS & HEADERS
@@ -59,22 +60,25 @@ def setup_logging():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    file_handler = RotatingFileHandler(
-        'logs/security.log',
-        maxBytes=5 * 1024 * 1024,
-        backupCount=5
-    )
-    file_handler.setFormatter(log_formatter)
-    file_handler.setLevel(logging.WARNING)
+    security_logger = logging.getLogger('security')
+    security_logger.setLevel(logging.DEBUG)
+
+    # Use FileHandler only if NOT on Vercel
+    if not os.environ.get('VERCEL'):
+        file_handler = RotatingFileHandler(
+            'logs/security.log',
+            maxBytes=5 * 1024 * 1024,
+            backupCount=5
+        )
+        file_handler.setFormatter(log_formatter)
+        file_handler.setLevel(logging.WARNING)
+        security_logger.addHandler(file_handler)
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s | %(message)s'))
     console_handler.setLevel(logging.INFO)
-
-    security_logger = logging.getLogger('security')
-    security_logger.setLevel(logging.DEBUG)
-    security_logger.addHandler(file_handler)
     security_logger.addHandler(console_handler)
+    
     return security_logger
 
 logger = setup_logging()
