@@ -187,60 +187,61 @@ def close_connection(exception):
         db.close()
 
 def init_db():
-    with app.app_context():
-        db = get_db()
-        cursor = db.cursor()
+    # Use a direct connection for initialization to avoid 'g' context issues at startup
+    db = sqlite3.connect(DATABASE)
+    cursor = db.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            is_verified BOOLEAN DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL,
+            type TEXT NOT NULL,
+            expires_at TIMESTAMP NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS chats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            title TEXT,
+            reward_score INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    try:
+        cursor.execute("ALTER TABLE chats ADD COLUMN user_id INTEGER DEFAULT 1 REFERENCES users(id)")
+    except sqlite3.OperationalError:
+        pass
         
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                is_verified BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS tokens (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                token_hash TEXT NOT NULL,
-                type TEXT NOT NULL,
-                expires_at TIMESTAMP NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-            )
-        ''')
-        
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS chats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                title TEXT,
-                reward_score INTEGER DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-            )
-        ''')
-        
-        try:
-            db.execute("ALTER TABLE chats ADD COLUMN user_id INTEGER DEFAULT 1 REFERENCES users(id)")
-            db.execute("INSERT OR IGNORE INTO users (id, email, password_hash, is_verified) VALUES (1, 'legacy@local', 'legacy', 1)")
-        except sqlite3.OperationalError:
-            pass
-            
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                chat_id INTEGER NOT NULL,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
-            )
-        ''')
-        db.commit()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chat_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
+        )
+    ''')
+    db.commit()
+    db.close()
 
+# Initialize once on module load
 init_db()
 
 # ========================
