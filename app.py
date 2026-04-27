@@ -145,7 +145,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')  # Switched back as this model was recognized previously
+    # Safety settings to prevent over-aggressive filtering of harmless messages
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+    model = genai.GenerativeModel('gemini-2.0-flash', safety_settings=safety_settings)
     logger.info("Gemini API configured successfully.", extra={'ip': 'SYSTEM'})
 else:
     logger.warning("GEMINI_API_KEY not found in environment variables.", extra={'ip': 'SYSTEM'})
