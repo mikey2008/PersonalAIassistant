@@ -47,7 +47,8 @@ Talisman(
     referrer_policy='strict-origin-when-cross-origin'
 )
 
-CORS(app, resources={r"/*": {"origins": ["http://localhost:8080", "https://yourdomain.com"]}}, supports_credentials=True)
+# Allow all origins in production/Vercel to avoid blocks
+CORS(app, supports_credentials=True)
 
 
 
