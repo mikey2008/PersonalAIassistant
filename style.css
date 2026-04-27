@@ -63,16 +63,20 @@ body {
 /* Sidebar */
 .sidebar {
     width: 260px;
+    min-width: 260px;
     background-color: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    transition: margin-left 0.3s ease;
+    transition: width 0.3s ease, min-width 0.3s ease, border 0.3s ease;
     flex-shrink: 0;
+    overflow: hidden; /* Clip content during collapse animation */
 }
 
 .sidebar.closed {
-    margin-left: -260px;
+    width: 0;
+    min-width: 0;
+    border-right: none;
 }
 
 .new-chat-btn {
@@ -126,6 +130,70 @@ body {
 .chat-item.active {
     background: rgba(255, 255, 255, 0.1);
     color: var(--text-primary);
+}
+
+.chat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+}
+
+.chat-item .chat-title {
+    flex-grow: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.delete-chat-btn {
+    opacity: 0.4;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.chat-item:hover .delete-chat-btn {
+    opacity: 1;
+}
+
+.delete-chat-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.sidebar-footer {
+    padding: var(--spacing-2);
+    border-top: 1px solid var(--border-color);
+    margin-top: auto;
+}
+
+.clear-all-btn {
+    width: 100%;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.clear-all-btn:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.05);
 }
 
 /* Main App Container */
@@ -440,7 +508,7 @@ body {
 
 /* Auth Pages */
 .auth-box {
-    background-color: var(--bg-sidebar);
+    background-color: var(--bg-secondary); /* was --bg-sidebar which didn't exist */
     padding: 40px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);

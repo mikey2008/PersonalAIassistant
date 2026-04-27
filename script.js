@@ -22,7 +22,8 @@ const authMessage = document.getElementById('auth-message');
 
 // API Config
 const CLIENT_API_KEY = 'jarvis-local-secret-2024';
-const baseURL = 'http://localhost:5000';
+const baseURL = ''; // Relative — served by Flask on same origin, no CORS needed
+const clearAllBtn = document.getElementById('clear-all-btn');
 
 const authHeaders = {
     'Content-Type': 'application/json',
@@ -205,8 +206,7 @@ logoutBtn?.addEventListener('click', async () => {
 checkSession();
 
 
-// --- 1. SIDEBAR & MEMORY LOGIC ---
-
+// --- 1. SIDEBAR TOGGLE ---
 if (toggleSidebarBtn) {
     toggleSidebarBtn.addEventListener('click', () => {
         sidebar.classList.toggle('closed');
@@ -216,14 +216,37 @@ if (toggleSidebarBtn) {
 async function loadSidebarChats() {
     try {
         const res = await fetch(`${baseURL}/chats`, fetchOptions);
-        if(res.status === 401) { window.location.reload(); return; } // Session expired
-        const chats = await res.json();
+        if(res.status === 401) { window.location.reload(); return; }
+        const data = await res.json();
+        if (!res.ok) {
+            console.error("Load chats error:", data.error);
+            return;
+        }
+        const chats = Array.isArray(data) ? data : [];
         chatList.innerHTML = '';
         chats.forEach(chat => {
             const li = document.createElement('li');
             li.className = `chat-item ${chat.id === currentChatId ? 'active' : ''}`;
-            li.textContent = chat.title || 'New Conversation';
-            li.onclick = () => loadChatHistory(chat.id);
+            
+            li.innerHTML = `
+                <span class="chat-title">${escapeHTML(chat.title || 'New Conversation')}</span>
+                <button class="delete-chat-btn" title="Delete Chat">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            `;
+            
+            // Handle clicking the chat item (load history)
+            li.querySelector('.chat-title').onclick = (e) => {
+                e.stopPropagation();
+                loadChatHistory(chat.id);
+            };
+            
+            // Handle clicking the delete button
+            li.querySelector('.delete-chat-btn').onclick = (e) => {
+                e.stopPropagation();
+                deleteChat(chat.id);
+            };
+
             chatList.appendChild(li);
         });
     } catch (e) {
@@ -231,12 +254,53 @@ async function loadSidebarChats() {
     }
 }
 
+async function deleteChat(chatId) {
+    if (!confirm("Are you sure you want to delete this chat?")) return;
+    try {
+        const res = await fetch(`${baseURL}/chats/${chatId}`, { method: 'DELETE', ...fetchOptions });
+        if (res.status === 401) { window.location.reload(); return; }
+        
+        if (currentChatId === chatId) {
+            currentChatId = null;
+            chatBox.innerHTML = '';
+            addMessageToUI("Hello! How can I help you today?", "bot");
+        }
+        loadSidebarChats();
+    } catch (e) {
+        console.error("Delete failed", e);
+    }
+}
+
+async function clearAllChats() {
+    if (!confirm("Are you sure you want to delete ALL chats? This cannot be undone.")) return;
+    try {
+        const res = await fetch(`${baseURL}/chats/clear-all`, { method: 'DELETE', ...fetchOptions });
+        if (res.status === 401) { window.location.reload(); return; }
+        
+        currentChatId = null;
+        chatBox.innerHTML = '';
+        addMessageToUI("Hello! How can I help you today?", "bot");
+        loadSidebarChats();
+    } catch (e) {
+        console.error("Clear all failed", e);
+    }
+}
+
+if (clearAllBtn) {
+    clearAllBtn.addEventListener('click', clearAllChats);
+}
+
 async function loadChatHistory(chatId) {
     try {
         currentChatId = chatId;
         const res = await fetch(`${baseURL}/chats/${chatId}`, fetchOptions);
         if(res.status === 401) { window.location.reload(); return; }
-        const messages = await res.json();
+        const data = await res.json();
+        if (!res.ok) {
+            console.error("Load history error:", data.error);
+            return;
+        }
+        const messages = Array.isArray(data) ? data : [];
         
         chatBox.innerHTML = '';
         
@@ -257,31 +321,45 @@ async function loadChatHistory(chatId) {
 async function createNewChat() {
     try {
         const res = await fetch(`${baseURL}/chats/new`, { method: 'POST', ...fetchOptions });
-        if(res.status === 401) { window.location.reload(); return; }
+        if (res.status === 401) { window.location.reload(); return null; }
         const data = await res.json();
+        if (!data.chat_id) throw new Error('No chat_id returned');
+
         currentChatId = data.chat_id;
-        
+
+        // Clear the chat area and show a fresh greeting
         chatBox.innerHTML = '';
         addMessageToUI("Hello! How can I help you today?", "bot");
+
+        // Refresh sidebar to show the new (empty) chat
         loadSidebarChats();
+
+        return data.chat_id; // Return so sendMessage can use it
     } catch (e) {
         console.error("Failed to create new chat", e);
+        return null;
     }
 }
 
 if (newChatBtn) {
-    newChatBtn.addEventListener('click', createNewChat);
+    newChatBtn.addEventListener('click', () => {
+        createNewChat();
+    });
 }
 
 // --- 2. SEND MESSAGE ---
 async function sendMessage(isVoice = false) {
-    if (!currentChatId) {
-        alert("Please create a new chat first!");
-        return;
-    }
-
     const text = messageInput.value.trim();
     if (text === '') return;
+
+    // If no chat is active (e.g. user types on home screen), auto-create one first
+    if (!currentChatId) {
+        const newId = await createNewChat();
+        if (!newId) {
+            addMessageToUI("Couldn't start a chat. Is the server running?", 'bot');
+            return;
+        }
+    }
 
     addMessageToUI(text, 'user');
     messageInput.value = '';
@@ -294,13 +372,13 @@ async function sendMessage(isVoice = false) {
             ...fetchOptions,
             body: JSON.stringify({ message: text, chat_id: currentChatId })
         });
-        
-        if(response.status === 401) { window.location.reload(); return; }
+
+        if (response.status === 401) { window.location.reload(); return; }
         const data = await response.json();
 
         removeElement(typingId);
         addMessageToUI(data.reply, 'bot');
-        loadSidebarChats();
+        loadSidebarChats(); // Refresh sidebar (updates title after first message)
 
         if (isVoice === true) {
             speakText(data.reply);

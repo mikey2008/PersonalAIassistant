@@ -3,6 +3,7 @@ import sqlite3
 import logging
 import time
 import secrets
+import random
 from datetime import datetime, timedelta
 from functools import wraps
 from logging.handlers import RotatingFileHandler
@@ -10,8 +11,6 @@ import html
 from flask import Flask, request, jsonify, g, session
 from flask_cors import CORS
 from flask_talisman import Talisman
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -22,10 +21,10 @@ load_dotenv()
 # ========================
 # APP INITIALIZATION
 # ========================
-app = Flask(__name__, instance_relative_config=True)
+app = Flask(__name__, instance_relative_config=True, static_folder='.', static_url_path='')
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'   # 'Lax' allows cross-origin requests in dev (http://localhost)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 
 # Ensure instance/ and logs/ directories exist
@@ -47,24 +46,9 @@ Talisman(
     referrer_policy='strict-origin-when-cross-origin'
 )
 
-CORS(app, resources={r"/*": {"origins": ["http://localhost:8080", "https://yourdomain.com"]}})
+CORS(app, resources={r"/*": {"origins": ["http://localhost:8080", "https://yourdomain.com"]}}, supports_credentials=True)
 
-# ========================
-# RATE LIMITING
-# ========================
-limiter = Limiter(
-    key_func=get_remote_address,
-    app=app,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://",
-)
 
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return jsonify({
-        "error": "Too many requests. Please slow down and try again later.",
-        "retry_after": str(e.description)
-    }), 429
 
 # ========================
 # SECURITY: LOGGING
@@ -153,13 +137,15 @@ def monitor_traffic():
         log_security(logging.WARNING, f"HIGH REQUEST RATE | IP: {ip} | {len(timestamps)} reqs in {RATE_LIMIT_WINDOW}s")
 
 # ========================
+# ========================
 # CONFIGURATION
 # ========================
+CLIENT_API_KEY = os.environ.get("CLIENT_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    model = genai.GenerativeModel('gemini-2.0-flash')  # Switched back as this model was recognized previously
     logger.info("Gemini API configured successfully.", extra={'ip': 'SYSTEM'})
 else:
     logger.warning("GEMINI_API_KEY not found in environment variables.", extra={'ip': 'SYSTEM'})
@@ -268,7 +254,6 @@ def login_required(f):
     return decorated
 
 @app.route('/auth/register', methods=['POST'])
-@limiter.limit("5 per minute")
 def register():
     data = request.get_json()
     email = data.get('email', '').strip().lower()
@@ -318,7 +303,6 @@ def verify_email(token):
     return jsonify({"error": "Invalid token."}), 400
 
 @app.route('/auth/login', methods=['POST'])
-@limiter.limit("10 per minute")
 def login():
     data = request.get_json()
     email = data.get('email', '').strip().lower()
@@ -343,7 +327,6 @@ def login():
     return jsonify({"error": "Invalid email or password."}), 401
 
 @app.route('/auth/forgot-password', methods=['POST'])
-@limiter.limit("3 per hour")
 def forgot_password():
     data = request.get_json()
     email = data.get('email', '').strip().lower()
@@ -366,7 +349,6 @@ def forgot_password():
     return jsonify({"message": "If that email exists, a reset link has been sent."}), 200
 
 @app.route('/auth/reset-password/<token>', methods=['POST'])
-@limiter.limit("5 per hour")
 def reset_password(token):
     data = request.get_json()
     new_password = data.get('password', '')
@@ -394,7 +376,6 @@ def reset_password(token):
     return jsonify({"error": "Invalid token."}), 400
 
 @app.route('/auth/guest-login', methods=['POST'])
-@limiter.limit("5 per minute")
 def guest_login():
     db = get_db()
     cursor = db.cursor()
@@ -423,7 +404,31 @@ def logout():
 # ========================
 # CHAT ROUTES
 # ========================
+
+def auto_guest_session(f):
+    """If no session exists, automatically create a guest user so the app works without login."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            # Auto-create a guest account and log them in silently
+            db = get_db()
+            cursor = db.cursor()
+            guest_email = f"guest_{secrets.token_hex(8)}@local"
+            pw_hash = generate_password_hash(secrets.token_urlsafe(16))
+            cursor.execute(
+                "INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)",
+                (guest_email, pw_hash)
+            )
+            db.commit()
+            session['user_id'] = cursor.lastrowid
+            session['is_guest'] = True
+            session.permanent = True
+            log_security(logging.INFO, f"Auto guest session created: user_id={session['user_id']}")
+        return f(*args, **kwargs)
+    return decorated
+
 def get_chat_or_404(chat_id):
+    """Return the chat row only if it belongs to the current session user."""
     db = get_db()
     cursor = db.cursor()
     cursor.execute("SELECT * FROM chats WHERE id = ? AND user_id = ?", (chat_id, session.get('user_id')))
@@ -431,8 +436,7 @@ def get_chat_or_404(chat_id):
 
 @app.route('/chats', methods=['GET'])
 @require_api_key
-@login_required
-@limiter.limit("30 per minute")
+@auto_guest_session
 def get_chats():
     db = get_db()
     cursor = db.cursor()
@@ -442,8 +446,7 @@ def get_chats():
 
 @app.route('/chats/new', methods=['POST'])
 @require_api_key
-@login_required
-@limiter.limit("5 per minute")
+@auto_guest_session
 def new_chat():
     db = get_db()
     cursor = db.cursor()
@@ -453,14 +456,13 @@ def new_chat():
 
 @app.route('/chats/<int:chat_id>', methods=['GET'])
 @require_api_key
-@login_required
-@limiter.limit("30 per minute")
+@auto_guest_session
 def get_chat_history(chat_id):
     if chat_id <= 0:
         return jsonify({"error": "Invalid chat_id."}), 400
     if not get_chat_or_404(chat_id):
         return jsonify({"error": "Chat not found."}), 404
-        
+
     db = get_db()
     cursor = db.cursor()
     cursor.execute("SELECT role, content FROM messages WHERE chat_id = ? ORDER BY timestamp ASC", (chat_id,))
@@ -468,30 +470,32 @@ def get_chat_history(chat_id):
     return jsonify(messages)
 
 @app.route('/chats/<int:chat_id>', methods=['DELETE'])
-@login_required
+@require_api_key
+@auto_guest_session
 def delete_chat(chat_id):
     if chat_id <= 0:
         return jsonify({"error": "Invalid chat_id."}), 400
     if not get_chat_or_404(chat_id):
         return jsonify({"error": "Chat not found."}), 404
-        
+
     db = get_db()
     db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
     db.commit()
-    db.commit()
     return jsonify({"success": True, "deleted_chat_id": chat_id})
 
-def get_chat_rate_limit_minute():
-    return "7 per minute" if session.get('is_guest') else "10 per minute"
+@app.route('/chats/clear-all', methods=['DELETE'])
+@require_api_key
+@auto_guest_session
+def clear_all_chats():
+    db = get_db()
+    db.execute("DELETE FROM chats WHERE user_id = ?", (session['user_id'],))
+    db.commit()
+    return jsonify({"success": True, "message": "All chats cleared."})
 
-def get_chat_rate_limit_day():
-    return "75 per day" if session.get('is_guest') else "100 per day"
 
 @app.route('/chat', methods=['POST'])
 @require_api_key
-@login_required
-@limiter.limit(get_chat_rate_limit_minute)
-@limiter.limit(get_chat_rate_limit_day)
+@auto_guest_session
 def chat():
     data = request.get_json()
     if not data or 'message' not in data:
@@ -541,15 +545,31 @@ def chat():
     final_prompt = SYSTEM_PROMPT.format(chat_history_filtered=formatted_history, user_input=user_input)
 
     ai_response_text = ""
-    try:
-        if GEMINI_API_KEY:
-            response = model.generate_content(final_prompt)
-            ai_response_text = response.text.strip()
-        else:
-            ai_response_text = "API key missing."
-    except Exception as e:
-        log_security(logging.ERROR, f"API ERROR: {str(e)}")
-        ai_response_text = "Error connecting to AI."
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            if GEMINI_API_KEY:
+                response = model.generate_content(final_prompt)
+                ai_response_text = response.text.strip()
+            else:
+                ai_response_text = "API key missing."
+            break  # Success — exit retry loop
+        except Exception as e:
+            err_str = str(e)
+            if "429" in err_str and attempt < max_retries - 1:
+                # Quota exceeded — wait with faster backoff for better UX
+                wait = (0.5 * (attempt + 1)) + random.uniform(0, 0.5)
+                log_security(logging.WARNING, f"QUOTA HIT (attempt {attempt+1}/{max_retries}), retrying in {wait:.1f}s")
+                time.sleep(wait)
+            else:
+                log_security(logging.ERROR, f"API ERROR: {err_str}")
+                if "429" in err_str:
+                    if "Daily" in err_str or "limit: 0" in err_str:
+                        ai_response_text = "Daily limit reached. Google has paused this API key for 24 hours. Please try again tomorrow or use a different key."
+                    else:
+                        ai_response_text = "I'm a little busy right now — please try again in a moment."
+                else:
+                    ai_response_text = "Error connecting to AI."
 
     cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)", (chat_id, 'ai', ai_response_text))
     db.commit()
@@ -567,7 +587,9 @@ def session_status():
 
 @app.route('/', methods=['GET'])
 def index():
-    return jsonify({"status": "Chatbot backend running."})
+    """Serve the frontend app directly — same origin as API, no CORS needed."""
+    return app.send_static_file('index.html')
+
 
 if __name__ == '__main__':
     if IS_PRODUCTION:
