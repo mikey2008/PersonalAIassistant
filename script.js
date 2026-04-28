@@ -377,6 +377,12 @@ async function sendMessage(isVoice = false) {
         const data = await response.json();
 
         removeElement(typingId);
+        
+        if (!response.ok || data.error) {
+            addMessageToUI(data.error || "An error occurred.", 'bot');
+            return;
+        }
+
         addMessageToUI(data.reply, 'bot');
         loadSidebarChats(); // Refresh sidebar (updates title after first message)
 
