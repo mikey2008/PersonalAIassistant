@@ -1,5 +1,6 @@
 import os
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import logging
 import time
 import secrets
@@ -158,22 +159,16 @@ else:
 # ========================
 # DATABASE
 # ========================
-# Database Setup - Use /tmp on Vercel as root is read-only
-if os.environ.get('VERCEL'):
-    DATABASE = '/tmp/database.db'
-else:
-    DATABASE = os.path.join(app.instance_path, 'database.db')
+# Database Setup
+DATABASE_URL = os.environ.get('DATABASE_URL')
 MAX_HISTORY_LENGTH = 16
 
 def get_db():
     db = getattr(g, '_database', None)
     if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
-        # Disable WAL on Vercel as /tmp doesn't always support it
-        if not os.environ.get('VERCEL'):
-            db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA foreign_keys=ON")
+        if not DATABASE_URL:
+            raise ValueError("DATABASE_URL is not set.")
+        db = g._database = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
     return db
 
 @app.teardown_appcontext
@@ -183,23 +178,24 @@ def close_connection(exception):
         db.close()
 
 def init_db():
-    # Use a direct connection for initialization to avoid 'g' context issues at startup
-    db = sqlite3.connect(DATABASE)
+    if not DATABASE_URL:
+        return
+    db = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
     cursor = db.cursor()
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            is_verified BOOLEAN DEFAULT 0,
+            is_verified BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tokens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             token_hash TEXT NOT NULL,
             type TEXT NOT NULL,
@@ -210,7 +206,7 @@ def init_db():
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS chats (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
             title TEXT,
             reward_score INTEGER DEFAULT 0,
@@ -219,14 +215,10 @@ def init_db():
         )
     ''')
     
-    try:
-        cursor.execute("ALTER TABLE chats ADD COLUMN user_id INTEGER DEFAULT 1 REFERENCES users(id)")
-    except sqlite3.OperationalError:
-        pass
-        
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             chat_id INTEGER NOT NULL,
             role TEXT NOT NULL,
             content TEXT NOT NULL,
@@ -268,18 +260,18 @@ def register():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
     if cursor.fetchone():
         return jsonify({"error": "Email already registered."}), 400
         
     pw_hash = generate_password_hash(password)
-    cursor.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)", (email, pw_hash))
-    user_id = cursor.lastrowid
+    cursor.execute("INSERT INTO users (email, password_hash) VALUES (%s, %s) RETURNING id", (email, pw_hash))
+    user_id = cursor.fetchone()['id']
     
     token = secrets.token_urlsafe(32)
     token_hash = generate_password_hash(token)
     expires = datetime.now() + timedelta(hours=24)
-    cursor.execute("INSERT INTO tokens (user_id, token_hash, type, expires_at) VALUES (?, ?, ?, ?)", 
+    cursor.execute("INSERT INTO tokens (user_id, token_hash, type, expires_at) VALUES (%s, %s, %s, %s)", 
                    (user_id, token_hash, 'verify', expires))
     db.commit()
     
@@ -299,8 +291,8 @@ def verify_email(token):
             if expires_at < datetime.now():
                 return jsonify({"error": "Token expired."}), 400
             
-            cursor.execute("UPDATE users SET is_verified = 1 WHERE id = ?", (t['user_id'],))
-            cursor.execute("DELETE FROM tokens WHERE id = ?", (t['id'],))
+            cursor.execute("UPDATE users SET is_verified = TRUE WHERE id = %s", (t['user_id'],))
+            cursor.execute("DELETE FROM tokens WHERE id = %s", (t['id'],))
             db.commit()
             return jsonify({"message": "Email verified successfully. You can now log in."}), 200
             
@@ -314,7 +306,7 @@ def login():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id, password_hash, is_verified FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT id, password_hash, is_verified FROM users WHERE email = %s", (email,))
     user = cursor.fetchone()
     
     if user and check_password_hash(user['password_hash'], password):
@@ -337,14 +329,14 @@ def forgot_password():
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
+    cursor.execute("SELECT id FROM users WHERE email = %s", (email,))
     user = cursor.fetchone()
     
     if user:
         token = secrets.token_urlsafe(32)
         token_hash = generate_password_hash(token)
         expires = datetime.now() + timedelta(hours=1)
-        cursor.execute("INSERT INTO tokens (user_id, token_hash, type, expires_at) VALUES (?, ?, ?, ?)", 
+        cursor.execute("INSERT INTO tokens (user_id, token_hash, type, expires_at) VALUES (%s, %s, %s, %s)", 
                        (user['id'], token_hash, 'reset', expires))
         db.commit()
         log_security(logging.INFO, f"MOCK EMAIL: Reset password link for {email}: http://localhost:5000/auth/reset-password/{token}")
@@ -371,8 +363,8 @@ def reset_password(token):
                 return jsonify({"error": "Token expired."}), 400
                 
             pw_hash = generate_password_hash(new_password)
-            cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (pw_hash, t['user_id']))
-            cursor.execute("DELETE FROM tokens WHERE id = ?", (t['id'],))
+            cursor.execute("UPDATE users SET password_hash = %s WHERE id = %s", (pw_hash, t['user_id']))
+            cursor.execute("DELETE FROM tokens WHERE id = %s", (t['id'],))
             db.commit()
             log_security(logging.INFO, f"Password reset for user_id: {t['user_id']}")
             return jsonify({"message": "Password reset successfully."}), 200
@@ -387,8 +379,8 @@ def guest_login():
     guest_email = f"guest_{secrets.token_hex(8)}@local"
     pw_hash = generate_password_hash(secrets.token_urlsafe(16))
     
-    cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, 1)", (guest_email, pw_hash))
-    user_id = cursor.lastrowid
+    cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (%s, %s, TRUE) RETURNING id", (guest_email, pw_hash))
+    user_id = cursor.fetchone()['id']
     db.commit()
     
     session.clear()
@@ -420,15 +412,15 @@ def auto_guest_session(f):
         # If user_id exists in session, verify they still exist in the DB (Vercel resets DB often)
         user_exists = False
         if 'user_id' in session:
-            cursor.execute("SELECT id FROM users WHERE id = ?", (session['user_id'],))
+            cursor.execute("SELECT id FROM users WHERE id = %s", (session['user_id'],))
             if cursor.fetchone():
                 user_exists = True
         
         if not user_exists:
-            cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (?, ?, ?)", 
-                           (f"guest_{secrets.token_hex(4)}@local", "guest", 1))
+            cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (%s, %s, TRUE) RETURNING id", 
+                           (f"guest_{secrets.token_hex(4)}@local", "guest"))
+            session['user_id'] = cursor.fetchone()['id']
             db.commit()
-            session['user_id'] = cursor.lastrowid
             session.permanent = True
             
         return f(*args, **kwargs)
@@ -438,7 +430,7 @@ def get_chat_or_404(chat_id):
     """Return the chat row only if it belongs to the current session user."""
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT * FROM chats WHERE id = ? AND user_id = ?", (chat_id, session.get('user_id')))
+    cursor.execute("SELECT * FROM chats WHERE id = %s AND user_id = %s", (chat_id, session.get('user_id')))
     return cursor.fetchone()
 
 @app.route('/chats', methods=['GET'])
@@ -447,7 +439,7 @@ def get_chat_or_404(chat_id):
 def get_chats():
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT id, title, reward_score, created_at FROM chats WHERE user_id = ? ORDER BY created_at DESC", (session['user_id'],))
+    cursor.execute("SELECT id, title, reward_score, created_at FROM chats WHERE user_id = %s ORDER BY created_at DESC", (session['user_id'],))
     chats = [dict(row) for row in cursor.fetchall()]
     return jsonify(chats)
 
@@ -457,9 +449,10 @@ def get_chats():
 def new_chat():
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("INSERT INTO chats (user_id, title, reward_score) VALUES (?, ?, 0)", (session['user_id'], "New Conversation"))
+    cursor.execute("INSERT INTO chats (user_id, title, reward_score) VALUES (%s, %s, 0) RETURNING id", (session['user_id'], "New Conversation"))
+    chat_id = cursor.fetchone()['id']
     db.commit()
-    return jsonify({"chat_id": cursor.lastrowid, "title": "New Conversation"})
+    return jsonify({"chat_id": chat_id, "title": "New Conversation"})
 
 @app.route('/chats/<int:chat_id>', methods=['GET'])
 @require_api_key
@@ -472,7 +465,7 @@ def get_chat_history(chat_id):
 
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("SELECT role, content FROM messages WHERE chat_id = ? ORDER BY timestamp ASC", (chat_id,))
+    cursor.execute("SELECT role, content FROM messages WHERE chat_id = %s ORDER BY timestamp ASC", (chat_id,))
     messages = [dict(row) for row in cursor.fetchall()]
     return jsonify(messages)
 
@@ -486,7 +479,7 @@ def delete_chat(chat_id):
         return jsonify({"error": "Chat not found."}), 404
 
     db = get_db()
-    db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+    db.execute("DELETE FROM chats WHERE id = %s", (chat_id,))
     db.commit()
     return jsonify({"success": True, "deleted_chat_id": chat_id})
 
@@ -495,7 +488,7 @@ def delete_chat(chat_id):
 @auto_guest_session
 def clear_all_chats():
     db = get_db()
-    db.execute("DELETE FROM chats WHERE user_id = ?", (session['user_id'],))
+    db.execute("DELETE FROM chats WHERE user_id = %s", (session['user_id'],))
     db.commit()
     return jsonify({"success": True, "message": "All chats cleared."})
 
@@ -533,18 +526,18 @@ def chat():
     if 'bad' in lower_input: score_delta -= 1
     
     if score_delta != 0:
-        cursor.execute("UPDATE chats SET reward_score = reward_score + ? WHERE id = ?", (score_delta, chat_id))
+        cursor.execute("UPDATE chats SET reward_score = reward_score + %s WHERE id = %s", (score_delta, chat_id))
         db.commit()
 
-    cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)", (chat_id, 'user', user_input))
+    cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (%s, %s, %s)", (chat_id, 'user', user_input))
     db.commit()
 
     if chat_row['title'] == "New Conversation":
         new_title = user_input[:30] + "..." if len(user_input) > 30 else user_input
-        cursor.execute("UPDATE chats SET title = ? WHERE id = ?", (new_title, chat_id))
+        cursor.execute("UPDATE chats SET title = %s WHERE id = %s", (new_title, chat_id))
         db.commit()
 
-    cursor.execute("SELECT role, content FROM messages WHERE chat_id = ? ORDER BY timestamp ASC", (chat_id,))
+    cursor.execute("SELECT role, content FROM messages WHERE chat_id = %s ORDER BY timestamp ASC", (chat_id,))
     all_msgs = cursor.fetchall()
     recent_msgs = all_msgs[-MAX_HISTORY_LENGTH:] if len(all_msgs) > MAX_HISTORY_LENGTH else all_msgs
     
@@ -581,10 +574,10 @@ def chat():
                 else:
                     ai_response_text = f"Error connecting to AI: {err_str}"
 
-    cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)", (chat_id, 'ai', ai_response_text))
+    cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (%s, %s, %s)", (chat_id, 'ai', ai_response_text))
     db.commit()
     
-    cursor.execute("SELECT reward_score FROM chats WHERE id = ?", (chat_id,))
+    cursor.execute("SELECT reward_score FROM chats WHERE id = %s", (chat_id,))
     updated_score = cursor.fetchone()['reward_score']
 
     return jsonify({"reply": ai_response_text, "reward": updated_score})

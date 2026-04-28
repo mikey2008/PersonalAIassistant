@@ -5,3 +5,4 @@ python-dotenv==1.0.0
 groq
 waitress==2.1.2
 werkzeug==3.0.1
+psycopg2-binary
