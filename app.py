@@ -579,7 +579,7 @@ def chat():
                 if "429" in err_str:
                     ai_response_text = "Daily limit reached. Please try again later or use a different key."
                 else:
-                    ai_response_text = "Error connecting to AI."
+                    ai_response_text = f"Error connecting to AI: {err_str}"
 
     cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)", (chat_id, 'ai', ai_response_text))
     db.commit()
