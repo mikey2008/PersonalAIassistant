@@ -247,7 +247,13 @@ async function loadPersona() {
                     currentBotAvatar = data.avatar_data;
                 }
             } else {
-                currentBotName = data.persona === 'Friendly Assistant' ? 'AI Assistant' : data.persona;
+                if (data.persona === 'Friendly Assistant') {
+                    currentBotName = 'AI Assistant';
+                } else if (data.persona === 'Sarcastic & Witty') {
+                    currentBotName = 'Daya Ben';
+                } else {
+                    currentBotName = data.persona;
+                }
                 appHeaderTitle.textContent = currentBotName;
                 currentBotAvatar = getPersonaAvatar(data.persona);
             }
@@ -274,7 +280,13 @@ if (personaSelect) {
             }
         } else {
             customPersonaBox.style.display = 'none';
-            currentBotName = newPersona === 'Friendly Assistant' ? 'AI Assistant' : newPersona;
+            if (newPersona === 'Friendly Assistant') {
+                currentBotName = 'AI Assistant';
+            } else if (newPersona === 'Sarcastic & Witty') {
+                currentBotName = 'Daya Ben';
+            } else {
+                currentBotName = newPersona;
+            }
             appHeaderTitle.textContent = currentBotName;
             currentBotAvatar = getPersonaAvatar(newPersona);
             
