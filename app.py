@@ -677,7 +677,7 @@ def chat():
 
     try:
         # 1. Get user persona from DB (Always fresh)
-        cursor.execute("SELECT persona, custom_description, custom_name FROM users WHERE id = %s", (session['user_id'],))
+        cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name FROM users WHERE id = %s", (session['user_id'],))
         user_data = cursor.fetchone()
         
         persona = user_data['persona'] if user_data and user_data['persona'] else 'Friendly Assistant'
@@ -685,9 +685,10 @@ def chat():
         display_name = persona if persona != "Friendly Assistant" else "AI Assistant"
         
         if persona == 'Custom':
-            persona_desc = user_data['custom_description'] if user_data and user_data['custom_description'] else 'Be a helpful assistant.'
-            display_name = user_data['custom_name'] if user_data and user_data['custom_name'] else 'Custom AI'
+            persona_desc = user_data['custom_persona_desc'] if user_data and user_data['custom_persona_desc'] else 'Be a helpful assistant.'
+            display_name = user_data['custom_persona_name'] if user_data and user_data['custom_persona_name'] else 'Custom AI'
     except Exception as e:
+        db.rollback()
         log_security(logging.ERROR, f"DB Fetch Error (Persona): {str(e)}")
     
     memories = get_user_memories(session['user_id'])
