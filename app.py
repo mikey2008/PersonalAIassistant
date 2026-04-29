@@ -190,6 +190,7 @@ def init_db():
             password_hash TEXT NOT NULL,
             is_verified BOOLEAN DEFAULT FALSE,
             persona TEXT DEFAULT 'Friendly Assistant',
+            custom_persona_desc TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -424,14 +425,23 @@ def manage_persona():
     cursor = db.cursor()
     if request.method == 'POST':
         data = request.get_json()
-        new_persona = data.get('persona', 'Friendly Assistant')
-        cursor.execute("UPDATE users SET persona = %s WHERE id = %s", (new_persona, session['user_id']))
+        new_persona = data.get('persona')
+        custom_desc = data.get('custom_description')
+        
+        if new_persona:
+            cursor.execute("UPDATE users SET persona = %s WHERE id = %s", (new_persona, session['user_id']))
+        if custom_desc is not None:
+            cursor.execute("UPDATE users SET custom_persona_desc = %s WHERE id = %s", (custom_desc, session['user_id']))
+            
         db.commit()
-        return jsonify({"message": "Persona updated", "persona": new_persona})
+        return jsonify({"message": "Persona updated"})
     
-    cursor.execute("SELECT persona FROM users WHERE id = %s", (session['user_id'],))
+    cursor.execute("SELECT persona, custom_persona_desc FROM users WHERE id = %s", (session['user_id'],))
     res = cursor.fetchone()
-    return jsonify({"persona": res['persona'] if res else 'Friendly Assistant'})
+    return jsonify({
+        "persona": res['persona'] if res else 'Friendly Assistant',
+        "custom_description": res['custom_persona_desc'] if res else ''
+    })
 
 # ========================
 # CHAT ROUTES
@@ -623,10 +633,14 @@ def chat():
     recent_msgs = all_msgs[-MAX_HISTORY_LENGTH:] if len(all_msgs) > MAX_HISTORY_LENGTH else all_msgs
     
     # Inject Persona & Memories
-    cursor.execute("SELECT persona FROM users WHERE id = %s", (session['user_id'],))
+    cursor.execute("SELECT persona, custom_persona_desc FROM users WHERE id = %s", (session['user_id'],))
     user_row = cursor.fetchone()
     persona_name = user_row['persona'] if user_row else "Friendly Assistant"
-    persona_desc = PERSONA_DESCRIPTIONS.get(persona_name, "Be a helpful assistant.")
+    
+    if persona_name == "Custom":
+        persona_desc = user_row['custom_persona_desc'] or "Be a helpful assistant."
+    else:
+        persona_desc = PERSONA_DESCRIPTIONS.get(persona_name, "Be a helpful assistant.")
     
     memories = get_user_memories(session['user_id'])
     memory_context = "\n".join([f"- {m}" for m in memories]) if memories else "No specific memories yet."

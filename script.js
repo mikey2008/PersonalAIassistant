@@ -25,6 +25,9 @@ const CLIENT_API_KEY = 'jarvis-local-secret-2024';
 const baseURL = ''; // Relative — served by Flask on same origin, no CORS needed
 const clearAllBtn = document.getElementById('clear-all-btn');
 const personaSelect = document.getElementById('persona-select');
+const customPersonaBox = document.getElementById('custom-persona-box');
+const customPersonaDesc = document.getElementById('custom-persona-desc');
+const saveCustomPersonaBtn = document.getElementById('save-custom-persona-btn');
 
 const authHeaders = {
     'Content-Type': 'application/json',
@@ -214,6 +217,12 @@ async function loadPersona() {
         const data = await res.json();
         if (data.persona) {
             personaSelect.value = data.persona;
+            if (data.persona === 'Custom') {
+                customPersonaBox.style.display = 'block';
+            }
+        }
+        if (data.custom_description) {
+            customPersonaDesc.value = data.custom_description;
         }
     } catch (e) {
         console.error("Load persona failed", e);
@@ -223,6 +232,12 @@ async function loadPersona() {
 if (personaSelect) {
     personaSelect.addEventListener('change', async () => {
         const newPersona = personaSelect.value;
+        if (newPersona === 'Custom') {
+            customPersonaBox.style.display = 'block';
+        } else {
+            customPersonaBox.style.display = 'none';
+        }
+        
         try {
             await fetch(`${baseURL}/persona`, {
                 method: 'POST',
@@ -231,6 +246,25 @@ if (personaSelect) {
             });
         } catch (e) {
             console.error("Update persona failed", e);
+        }
+    });
+}
+
+if (saveCustomPersonaBtn) {
+    saveCustomPersonaBtn.addEventListener('click', async () => {
+        const desc = customPersonaDesc.value;
+        saveCustomPersonaBtn.textContent = 'Saving...';
+        try {
+            await fetch(`${baseURL}/persona`, {
+                method: 'POST',
+                ...fetchOptions,
+                body: JSON.stringify({ custom_description: desc })
+            });
+            saveCustomPersonaBtn.textContent = 'Saved!';
+            setTimeout(() => { saveCustomPersonaBtn.textContent = 'Save Description'; }, 2000);
+        } catch (e) {
+            console.error("Save custom persona failed", e);
+            saveCustomPersonaBtn.textContent = 'Error';
         }
     });
 }
