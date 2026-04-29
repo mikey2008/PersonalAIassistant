@@ -42,11 +42,11 @@ const authHeaders = {
 
 const PERSONA_AVATARS = {
     "Friendly Assistant": "avatars/friendly.png",
-    "Professional & Concise": "avatars/professional.png",
-    "JARVIS (Iron Man)": "avatars/jarvis.png",
-    "Sarcastic & Witty": "avatars/sarcastic.png",
-    "Pirate Captain": "avatars/pirate.png",
-    "Samay": "avatars/samay.png"
+    "Professional & Concise": "avatars/professional.jpg",
+    "JARVIS (Iron Man)": "avatars/jarvis.jpg",
+    "Sarcastic & Witty": "avatars/sarcastic.jpg",
+    "Pirate Captain": "avatars/pirate.jpg",
+    "Samay": "avatars/samay.jpg"
 };
 
 function getPersonaAvatar(persona) {
