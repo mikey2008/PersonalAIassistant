@@ -248,7 +248,7 @@ async function loadPersona() {
                 }
             } else {
                 if (data.persona === 'Friendly Assistant') {
-                    currentBotName = 'AI Assistant';
+                    currentBotName = 'Baymax';
                 } else if (data.persona === 'Sarcastic & Witty') {
                     currentBotName = 'Daya Ben';
                 } else {
@@ -281,7 +281,7 @@ if (personaSelect) {
         } else {
             customPersonaBox.style.display = 'none';
             if (newPersona === 'Friendly Assistant') {
-                currentBotName = 'AI Assistant';
+                currentBotName = 'Baymax';
             } else if (newPersona === 'Sarcastic & Witty') {
                 currentBotName = 'Daya Ben';
             } else {
