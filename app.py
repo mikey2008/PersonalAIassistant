@@ -5,6 +5,7 @@ import logging
 import time
 import secrets
 import random
+import threading
 from datetime import datetime, timedelta
 from functools import wraps
 from logging.handlers import RotatingFileHandler
@@ -728,11 +729,12 @@ def chat():
     cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (%s, %s, %s)", (chat_id, 'ai', ai_response_text))
     db.commit()
 
-    # Learning Step (Update Memories)
-    update_user_memories(session['user_id'], user_input, ai_response_text)
+    # Learning Step (Update Memories) - Run in background to speed up response
+    threading.Thread(target=update_user_memories, args=(session['user_id'], user_input, ai_response_text)).start()
     
     cursor.execute("SELECT reward_score FROM chats WHERE id = %s", (chat_id,))
-    updated_score = cursor.fetchone()['reward_score']
+    res = cursor.fetchone()
+    updated_score = res['reward_score'] if res else 0
 
     return jsonify({"reply": ai_response_text, "reward": updated_score})
 
