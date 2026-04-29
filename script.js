@@ -39,6 +39,19 @@ const authHeaders = {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${CLIENT_API_KEY}`
 };
+
+const PERSONA_AVATARS = {
+    "Friendly Assistant": "avatars/friendly.png",
+    "Professional & Concise": "avatars/professional.png",
+    "JARVIS (Iron Man)": "avatars/jarvis.png",
+    "Sarcastic & Witty": "avatars/sarcastic.png",
+    "Pirate Captain": "avatars/pirate.png",
+    "Samay": "avatars/samay.png"
+};
+
+function getPersonaAvatar(persona) {
+    return PERSONA_AVATARS[persona] || "baymax.png";
+}
 const fetchOptions = {
     headers: authHeaders,
     credentials: 'include'
@@ -236,7 +249,7 @@ async function loadPersona() {
             } else {
                 currentBotName = data.persona === 'Friendly Assistant' ? 'AI Assistant' : data.persona;
                 appHeaderTitle.textContent = currentBotName;
-                currentBotAvatar = "baymax.png";
+                currentBotAvatar = getPersonaAvatar(data.persona);
             }
         }
         if (data.custom_description) {
@@ -263,7 +276,7 @@ if (personaSelect) {
             customPersonaBox.style.display = 'none';
             currentBotName = newPersona === 'Friendly Assistant' ? 'AI Assistant' : newPersona;
             appHeaderTitle.textContent = currentBotName;
-            currentBotAvatar = "baymax.png";
+            currentBotAvatar = getPersonaAvatar(newPersona);
         }
         
         try {
