@@ -24,6 +24,7 @@ const authMessage = document.getElementById('auth-message');
 const CLIENT_API_KEY = 'jarvis-local-secret-2024';
 const baseURL = ''; // Relative — served by Flask on same origin, no CORS needed
 const clearAllBtn = document.getElementById('clear-all-btn');
+const personaSelect = document.getElementById('persona-select');
 
 const authHeaders = {
     'Content-Type': 'application/json',
@@ -56,6 +57,7 @@ async function checkSession() {
         if (data.authenticated) {
             authPage.style.display = 'none';
             startupPage.style.display = 'flex';
+            loadPersona(); // Load user persona after auth
         } else {
             authPage.style.display = 'flex';
             startupPage.style.display = 'none';
@@ -204,6 +206,34 @@ logoutBtn?.addEventListener('click', async () => {
 
 // Initialize
 checkSession();
+
+async function loadPersona() {
+    if (!personaSelect) return;
+    try {
+        const res = await fetch(`${baseURL}/persona`, fetchOptions);
+        const data = await res.json();
+        if (data.persona) {
+            personaSelect.value = data.persona;
+        }
+    } catch (e) {
+        console.error("Load persona failed", e);
+    }
+}
+
+if (personaSelect) {
+    personaSelect.addEventListener('change', async () => {
+        const newPersona = personaSelect.value;
+        try {
+            await fetch(`${baseURL}/persona`, {
+                method: 'POST',
+                ...fetchOptions,
+                body: JSON.stringify({ persona: newPersona })
+            });
+        } catch (e) {
+            console.error("Update persona failed", e);
+        }
+    });
+}
 
 
 // --- 1. SIDEBAR TOGGLE ---

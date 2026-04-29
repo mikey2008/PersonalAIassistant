@@ -189,6 +189,7 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             is_verified BOOLEAN DEFAULT FALSE,
+            persona TEXT DEFAULT 'Friendly Assistant',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -407,6 +408,22 @@ def logout():
     session.clear()
     return jsonify({"message": "Logged out."}), 200
 
+@app.route('/persona', methods=['GET', 'POST'])
+@login_required
+def manage_persona():
+    db = get_db()
+    cursor = db.cursor()
+    if request.method == 'POST':
+        data = request.get_json()
+        new_persona = data.get('persona', 'Friendly Assistant')
+        cursor.execute("UPDATE users SET persona = %s WHERE id = %s", (new_persona, session['user_id']))
+        db.commit()
+        return jsonify({"message": "Persona updated", "persona": new_persona})
+    
+    cursor.execute("SELECT persona FROM users WHERE id = %s", (session['user_id'],))
+    res = cursor.fetchone()
+    return jsonify({"persona": res['persona'] if res else 'Friendly Assistant'})
+
 # ========================
 # CHAT ROUTES
 # ========================
@@ -596,10 +613,14 @@ def chat():
     all_msgs = cursor.fetchall()
     recent_msgs = all_msgs[-MAX_HISTORY_LENGTH:] if len(all_msgs) > MAX_HISTORY_LENGTH else all_msgs
     
-    # Inject Memories
+    # Inject Persona & Memories
+    cursor.execute("SELECT persona FROM users WHERE id = %s", (session['user_id'],))
+    user_row = cursor.fetchone()
+    persona = user_row['persona'] if user_row else "Friendly Assistant"
+    
     memories = get_user_memories(session['user_id'])
     memory_context = "\n".join([f"- {m}" for m in memories]) if memories else "No specific memories yet."
-    full_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\nUSER MEMORIES & CONTEXT:\n{memory_context}"
+    full_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\nCURRENT PERSONALITY: {persona}\n\nUSER MEMORIES & CONTEXT:\n{memory_context}"
     
     messages = [{"role": "system", "content": full_system_prompt}]
     for m in recent_msgs[:-1]:
