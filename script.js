@@ -584,7 +584,7 @@ function showTypingIndicator() {
     typingElement.id = uniqueId;
     typingElement.classList.add('message', 'bot-message', 'typing');
     typingElement.innerHTML = `
-        <div class="avatar"><img src="baymax.png" alt="Bot Avatar"></div>
+        <div class="avatar"><img src="${currentBotAvatar}" alt="Bot Avatar"></div>
         <div class="message-content">AI is typing...</div>
     `;
     
