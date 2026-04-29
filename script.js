@@ -379,7 +379,8 @@ async function loadSidebarChats() {
 }
 
 async function deleteChat(chatId) {
-    if (!confirm("Are you sure you want to delete this chat?")) return;
+    const confirmed = await showConfirm("Delete Chat?", "Are you sure you want to delete this chat?");
+    if (!confirmed) return;
     try {
         const res = await fetch(`${baseURL}/chats/${chatId}`, { method: 'DELETE', ...fetchOptions });
         if (res.status === 401) { window.location.reload(); return; }
@@ -396,7 +397,8 @@ async function deleteChat(chatId) {
 }
 
 async function clearAllChats() {
-    if (!confirm("Are you sure you want to delete ALL chats? This cannot be undone.")) return;
+    const confirmed = await showConfirm("Clear All?", "Are you sure you want to delete ALL chats? This cannot be undone.");
+    if (!confirmed) return;
     try {
         const res = await fetch(`${baseURL}/chats/clear-all`, { method: 'DELETE', ...fetchOptions });
         if (res.status === 401) { window.location.reload(); return; }
@@ -668,6 +670,37 @@ function speakText(text) {
     } else {
         console.warn("Text-to-speech is not supported in your browser.");
     }
+}
+function showConfirm(title, message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('custom-modal');
+        const titleEl = document.getElementById('modal-title');
+        const messageEl = document.getElementById('modal-message');
+        const confirmBtn = document.getElementById('modal-confirm');
+        const cancelBtn = document.getElementById('modal-cancel');
+
+        titleEl.textContent = title;
+        messageEl.textContent = message;
+        
+        modal.style.display = 'flex';
+        // Force reflow
+        modal.offsetHeight;
+        modal.classList.add('active');
+
+        const cleanup = (val) => {
+            modal.classList.remove('active');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+            resolve(val);
+        };
+
+        confirmBtn.onclick = () => cleanup(true);
+        cancelBtn.onclick = () => cleanup(false);
+        
+        // Close on overlay click
+        modal.onclick = (e) => {
+            if (e.target === modal) cleanup(false);
+        };
+    });
 }
 
 // --- EVENT LISTENERS ---
