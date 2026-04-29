@@ -457,14 +457,22 @@ def manage_persona():
         db.commit()
         return jsonify({"message": "Persona updated"})
     
-    cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name, custom_avatar_data FROM users WHERE id = %s", (session['user_id'],))
-    res = cursor.fetchone()
-    return jsonify({
-        "persona": res['persona'] if res else 'Friendly Assistant',
-        "custom_description": res['custom_persona_desc'] if res else '',
-        "custom_name": res['custom_persona_name'] if res else '',
-        "avatar_data": res['custom_avatar_data'] if res else None
-    })
+    try:
+        cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name, custom_avatar_data FROM users WHERE id = %s", (session['user_id'],))
+        res = cursor.fetchone()
+        return jsonify({
+            "persona": res['persona'] if res else 'Friendly Assistant',
+            "custom_description": res['custom_persona_desc'] if res else '',
+            "custom_name": res['custom_persona_name'] if res else '',
+            "avatar_data": res['custom_avatar_data'] if res else None
+        })
+    except Exception:
+        return jsonify({
+            "persona": 'Friendly Assistant',
+            "custom_description": '',
+            "custom_name": '',
+            "avatar_data": None
+        })
 
 # ========================
 # CHAT ROUTES
@@ -656,15 +664,23 @@ def chat():
     recent_msgs = all_msgs[-MAX_HISTORY_LENGTH:] if len(all_msgs) > MAX_HISTORY_LENGTH else all_msgs
     
     # Inject Persona & Memories
-    cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name FROM users WHERE id = %s", (session['user_id'],))
-    user_row = cursor.fetchone()
-    persona_name = user_row['persona'] if user_row else "Friendly Assistant"
-    display_name = user_row['custom_persona_name'] if (persona_name == "Custom" and user_row['custom_persona_name']) else persona_name
-    
-    if persona_name == "Custom":
-        persona_desc = user_row['custom_persona_desc'] or "Be a helpful assistant."
-    else:
-        persona_desc = PERSONA_DESCRIPTIONS.get(persona_name, "Be a helpful assistant.")
+    persona_name = "Friendly Assistant"
+    persona_desc = "Be helpful, kind, and polite."
+    display_name = "AI Assistant"
+
+    try:
+        cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name FROM users WHERE id = %s", (session['user_id'],))
+        user_row = cursor.fetchone()
+        if user_row:
+            persona_name = user_row['persona'] or "Friendly Assistant"
+            if persona_name == "Custom":
+                persona_desc = user_row['custom_persona_desc'] or "Be a helpful assistant."
+                display_name = user_row['custom_persona_name'] or "Custom AI"
+            else:
+                persona_desc = PERSONA_DESCRIPTIONS.get(persona_name, "Be a helpful assistant.")
+                display_name = persona_name if persona_name != "Friendly Assistant" else "AI Assistant"
+    except Exception as e:
+        log_security(logging.ERROR, f"DB Fetch Error (Persona): {str(e)}")
     
     memories = get_user_memories(session['user_id'])
     memory_context = "\n".join([f"- {m}" for m in memories]) if memories else "No specific memories yet."
