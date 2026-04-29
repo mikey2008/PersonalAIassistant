@@ -277,6 +277,10 @@ if (personaSelect) {
             currentBotName = newPersona === 'Friendly Assistant' ? 'AI Assistant' : newPersona;
             appHeaderTitle.textContent = currentBotName;
             currentBotAvatar = getPersonaAvatar(newPersona);
+            
+            // Clear current chat to reflect persona change visually
+            chatBox.innerHTML = '';
+            addMessageToUI(`Hello! I am now in ${newPersona} mode. How can I help you?`, "bot");
         }
         
         try {

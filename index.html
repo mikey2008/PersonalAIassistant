@@ -157,7 +157,12 @@
         </footer>
         </div>
     </div>
-    <script src="script.js?v=3"></script>
+    <script>
+        // Nuclear Cache Buster: Load script with a fresh timestamp every time
+        const script = document.createElement('script');
+        script.src = 'script.js?v=' + Date.now();
+        document.body.appendChild(script);
+    </script>
 
     <!-- Custom Modal -->
     <div id="custom-modal" class="modal-overlay" style="display: none;">

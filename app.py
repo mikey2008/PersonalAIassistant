@@ -676,16 +676,17 @@ def chat():
     display_name = "AI Assistant"
 
     try:
-        cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name FROM users WHERE id = %s", (session['user_id'],))
-        user_row = cursor.fetchone()
-        if user_row:
-            persona_name = user_row['persona'] or "Friendly Assistant"
-            if persona_name == "Custom":
-                persona_desc = user_row['custom_persona_desc'] or "Be a helpful assistant."
-                display_name = user_row['custom_persona_name'] or "Custom AI"
-            else:
-                persona_desc = PERSONA_DESCRIPTIONS.get(persona_name, "Be a helpful assistant.")
-                display_name = persona_name if persona_name != "Friendly Assistant" else "AI Assistant"
+        # 1. Get user persona from DB (Always fresh)
+        cursor.execute("SELECT persona, custom_description, custom_name FROM users WHERE id = %s", (session['user_id'],))
+        user_data = cursor.fetchone()
+        
+        persona = user_data['persona'] if user_data and user_data['persona'] else 'Friendly Assistant'
+        persona_desc = PERSONA_DESCRIPTIONS.get(persona, PERSONA_DESCRIPTIONS['Friendly Assistant'])
+        display_name = persona if persona != "Friendly Assistant" else "AI Assistant"
+        
+        if persona == 'Custom':
+            persona_desc = user_data['custom_description'] if user_data and user_data['custom_description'] else 'Be a helpful assistant.'
+            display_name = user_data['custom_name'] if user_data and user_data['custom_name'] else 'Custom AI'
     except Exception as e:
         log_security(logging.ERROR, f"DB Fetch Error (Persona): {str(e)}")
     
