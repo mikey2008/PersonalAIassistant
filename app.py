@@ -164,19 +164,23 @@ else:
 DATABASE_URL = os.environ.get('DATABASE_URL')
 MAX_HISTORY_LENGTH = 16
 
+# Use a persistent global connection to speed up requests on Vercel/Serverless
+_global_db = None
+
 def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
+    global _global_db
+    if _global_db is None or _global_db.closed != 0:
         if not DATABASE_URL:
             raise ValueError("DATABASE_URL is not set.")
-        db = g._database = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
-    return db
+        _global_db = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.DictCursor)
+        _global_db.autocommit = True
+    return _global_db
 
 @app.teardown_appcontext
 def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+    # In Serverless, we actually WANT to keep the connection open for reuse
+    # so we don't close it on teardown unless it's a specific error
+    pass
 
 def init_db():
     if not DATABASE_URL:
@@ -638,60 +642,48 @@ def chat():
     if not isinstance(chat_id, int) or chat_id <= 0:
         return jsonify({"error": "Invalid chat_id."}), 400
         
-    chat_row = get_chat_or_404(chat_id)
-    if not chat_row:
-        return jsonify({"error": "Chat not found."}), 404
-
-    user_input = html.escape(raw_message.strip())
-    if not user_input:
-        return jsonify({"error": "Message empty."}), 400
-
     db = get_db()
     cursor = db.cursor()
 
+    # Consolidated DB Fetch: Get Chat, Persona, and Memories in fewer calls
+    cursor.execute("SELECT * FROM chats WHERE id = %s", (chat_id,))
+    chat_row = cursor.fetchone()
+    if not chat_row: return jsonify({"error": "Chat not found."}), 404
+
+    cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name FROM users WHERE id = %s", (session['user_id'],))
+    user_data = cursor.fetchone()
+
+    cursor.execute("SELECT content FROM memories WHERE user_id = %s ORDER BY created_at ASC", (session['user_id'],))
+    memories = [r['content'] for r in cursor.fetchall()]
+
+    # Persona Logic
+    persona = user_data['persona'] if user_data and user_data['persona'] else 'Friendly Assistant'
+    persona_desc = PERSONA_DESCRIPTIONS.get(persona, PERSONA_DESCRIPTIONS['Friendly Assistant'])
+    display_name = persona if persona != "Friendly Assistant" else "AI Assistant"
+    if persona == 'Custom':
+        persona_desc = user_data['custom_persona_desc'] or 'Be a helpful assistant.'
+        display_name = user_data['custom_persona_name'] or 'Custom AI'
+
+    # 2. Add Message and Score
+    user_input = html.escape(raw_message.strip())
     lower_input = user_input.lower()
     score_delta = 0
     if 'good' in lower_input: score_delta += 1
     if 'bad' in lower_input: score_delta -= 1
     
+    cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (%s, %s, %s)", (chat_id, 'user', user_input))
     if score_delta != 0:
         cursor.execute("UPDATE chats SET reward_score = reward_score + %s WHERE id = %s", (score_delta, chat_id))
-        db.commit()
-
-    cursor.execute("INSERT INTO messages (chat_id, role, content) VALUES (%s, %s, %s)", (chat_id, 'user', user_input))
-    db.commit()
-
+    
     if chat_row['title'] == "New Conversation":
         new_title = user_input[:30] + "..." if len(user_input) > 30 else user_input
         cursor.execute("UPDATE chats SET title = %s WHERE id = %s", (new_title, chat_id))
-        db.commit()
 
+    # Get recent messages for context
     cursor.execute("SELECT role, content FROM messages WHERE chat_id = %s ORDER BY timestamp ASC", (chat_id,))
     all_msgs = cursor.fetchall()
     recent_msgs = all_msgs[-MAX_HISTORY_LENGTH:] if len(all_msgs) > MAX_HISTORY_LENGTH else all_msgs
     
-    # Inject Persona & Memories
-    persona_name = "Friendly Assistant"
-    persona_desc = "Be helpful, kind, and polite."
-    display_name = "AI Assistant"
-
-    try:
-        # 1. Get user persona from DB (Always fresh)
-        cursor.execute("SELECT persona, custom_persona_desc, custom_persona_name FROM users WHERE id = %s", (session['user_id'],))
-        user_data = cursor.fetchone()
-        
-        persona = user_data['persona'] if user_data and user_data['persona'] else 'Friendly Assistant'
-        persona_desc = PERSONA_DESCRIPTIONS.get(persona, PERSONA_DESCRIPTIONS['Friendly Assistant'])
-        display_name = persona if persona != "Friendly Assistant" else "AI Assistant"
-        
-        if persona == 'Custom':
-            persona_desc = user_data['custom_persona_desc'] if user_data and user_data['custom_persona_desc'] else 'Be a helpful assistant.'
-            display_name = user_data['custom_persona_name'] if user_data and user_data['custom_persona_name'] else 'Custom AI'
-    except Exception as e:
-        db.rollback()
-        log_security(logging.ERROR, f"DB Fetch Error (Persona): {str(e)}")
-    
-    memories = get_user_memories(session['user_id'])
     memory_context = "\n".join([f"- {m}" for m in memories]) if memories else "No specific memories yet."
     full_system_prompt = f"{BASE_SYSTEM_PROMPT}\n\nCURRENT PERSONALITY: {display_name}\nTRAITS: {persona_desc}\n\nUSER MEMORIES & CONTEXT:\n{memory_context}"
     
