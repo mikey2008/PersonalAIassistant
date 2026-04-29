@@ -514,6 +514,12 @@ async function sendMessage(isVoice = false) {
         removeElement(typingId);
         
         if (!response.ok || data.error) {
+            if (response.status === 404) {
+                // Chat was lost (e.g. server restart/session cleared)
+                currentChatId = null;
+                // Try sending again (it will auto-create a new chat)
+                return sendMessage(isVoice);
+            }
             addMessageToUI(data.error || "An error occurred.", 'bot');
             return;
         }
