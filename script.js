@@ -249,6 +249,8 @@ async function loadPersona() {
             } else {
                 if (data.persona === 'Friendly Assistant') {
                     currentBotName = 'Baymax';
+                } else if (data.persona === 'Professional & Concise') {
+                    currentBotName = 'Harvey Specter';
                 } else if (data.persona === 'JARVIS (Iron Man)') {
                     currentBotName = 'Tony Stark';
                 } else if (data.persona === 'Sarcastic & Witty') {
@@ -284,6 +286,8 @@ if (personaSelect) {
             customPersonaBox.style.display = 'none';
             if (newPersona === 'Friendly Assistant') {
                 currentBotName = 'Baymax';
+            } else if (newPersona === 'Professional & Concise') {
+                currentBotName = 'Harvey Specter';
             } else if (newPersona === 'JARVIS (Iron Man)') {
                 currentBotName = 'Tony Stark';
             } else if (newPersona === 'Sarcastic & Witty') {
