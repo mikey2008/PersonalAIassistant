@@ -241,6 +241,18 @@ def init_db():
         )
     ''')
     db.commit()
+
+    # Schema Migrations (Add columns if they don't exist)
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS persona TEXT DEFAULT 'Friendly Assistant'")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_persona_desc TEXT")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_persona_name TEXT")
+        cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_avatar_data TEXT")
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Migration error: {e}")
+
     db.close()
 
 # Initialize once on module load
