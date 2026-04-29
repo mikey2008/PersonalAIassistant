@@ -22,7 +22,7 @@ const authMessage = document.getElementById('auth-message');
 
 // API Config
 const CLIENT_API_KEY = 'jarvis-local-secret-2024';
-const baseURL = ''; // Relative — served by Flask on same origin, no CORS needed
+const baseURL = window.location.origin; // Explicit origin for mobile reliability
 const clearAllBtn = document.getElementById('clear-all-btn');
 const personaSelect = document.getElementById('persona-select');
 const customPersonaBox = document.getElementById('custom-persona-box');
@@ -521,11 +521,24 @@ async function sendMessage(isVoice = false) {
     const typingId = showTypingIndicator();
 
     try {
-        const response = await fetch(`${baseURL}/chat`, {
-            method: 'POST',
-            ...fetchOptions,
-            body: JSON.stringify({ message: text, chat_id: currentChatId })
-        });
+        let response;
+        let attempts = 0;
+        const maxAttempts = 2;
+
+        while (attempts < maxAttempts) {
+            try {
+                response = await fetch(`${baseURL}/chat`, {
+                    method: 'POST',
+                    ...fetchOptions,
+                    body: JSON.stringify({ message: text, chat_id: currentChatId })
+                });
+                if (response.ok || response.status === 401) break;
+            } catch (err) {
+                attempts++;
+                if (attempts >= maxAttempts) throw err;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
 
         if (response.status === 401) { window.location.reload(); return; }
         const data = await response.json();
