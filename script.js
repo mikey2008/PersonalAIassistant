@@ -526,7 +526,7 @@ async function sendMessage(isVoice = false) {
         const maxAttempts = 2;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout for cold starts
 
         while (attempts < maxAttempts) {
             try {
@@ -770,3 +770,6 @@ if (startChatBtn && startupPage && mainLayout) {
         });
     });
 }
+
+// Background Wake-up (Pre-warm server)
+fetch(`${baseURL}/session-status`, fetchOptions).catch(() => {});
