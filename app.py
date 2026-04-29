@@ -445,7 +445,8 @@ def logout():
     return jsonify({"message": "Logged out."}), 200
 
 @app.route('/persona', methods=['GET', 'POST'])
-@login_required
+@require_api_key
+@auto_guest_session
 def manage_persona():
     db = get_db()
     cursor = db.cursor()
