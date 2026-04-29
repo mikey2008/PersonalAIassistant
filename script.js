@@ -253,6 +253,8 @@ async function loadPersona() {
                     currentBotName = 'Harvey Specter';
                 } else if (data.persona === 'JARVIS (Iron Man)') {
                     currentBotName = 'Tony Stark';
+                } else if (data.persona === 'Pirate Captain') {
+                    currentBotName = 'Jack Sparrow';
                 } else if (data.persona === 'Sarcastic & Witty') {
                     currentBotName = 'Daya Ben';
                 } else {
@@ -290,6 +292,8 @@ if (personaSelect) {
                 currentBotName = 'Harvey Specter';
             } else if (newPersona === 'JARVIS (Iron Man)') {
                 currentBotName = 'Tony Stark';
+            } else if (newPersona === 'Pirate Captain') {
+                currentBotName = 'Jack Sparrow';
             } else if (newPersona === 'Sarcastic & Witty') {
                 currentBotName = 'Daya Ben';
             } else {
