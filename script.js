@@ -748,32 +748,19 @@ if (messageInput) {
 
 // --- STARTUP PAGE LOGIC ---
 if (startChatBtn && startupPage && mainLayout) {
-    startChatBtn.addEventListener('click', async () => {
-        startChatBtn.disabled = true;
-        startupPage.style.opacity = '0';
-        startupPage.style.transition = 'opacity 0.5s ease';
+    startChatBtn.addEventListener('click', () => {
+        // Instant Switch
+        startupPage.style.display = 'none';
+        mainLayout.style.display = 'flex';
         
-        try {
-            // Try to load existing chats first
-            await loadSidebarChats();
-            
-            // If there are NO chats, create one.
+        // Background work
+        loadSidebarChats().then(() => {
             if (chatList.children.length === 0) {
-                await createNewChat();
+                createNewChat();
             } else if (!currentChatId) {
-                // Load the most recent chat
                 const firstChat = chatList.querySelector('.chat-item');
                 if (firstChat) firstChat.click();
             }
-        } catch (e) {
-            console.error("Startup error:", e);
-            // Even if it fails, we want to show the chat layout
-        } finally {
-            setTimeout(() => {
-                startupPage.style.display = 'none';
-                mainLayout.style.display = 'flex';
-                startChatBtn.disabled = false;
-            }, 500);
-        }
+        });
     });
 }
