@@ -525,20 +525,26 @@ async function sendMessage(isVoice = false) {
         let attempts = 0;
         const maxAttempts = 2;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
         while (attempts < maxAttempts) {
             try {
                 response = await fetch(`${baseURL}/chat`, {
                     method: 'POST',
                     ...fetchOptions,
+                    signal: controller.signal,
                     body: JSON.stringify({ message: text, chat_id: currentChatId })
                 });
                 if (response.ok || response.status === 401) break;
             } catch (err) {
                 attempts++;
+                if (err.name === 'AbortError') break;
                 if (attempts >= maxAttempts) throw err;
                 await new Promise(r => setTimeout(r, 1000));
             }
         }
+        clearTimeout(timeoutId);
 
         if (response.status === 401) { window.location.reload(); return; }
         const data = await response.json();
