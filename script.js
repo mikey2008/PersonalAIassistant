@@ -45,6 +45,7 @@ const fetchOptions = {
 };
 
 let currentChatId = null;
+let isCreatingChat = false;
 
 // --- 0. INITIALIZATION & AUTH FLOW ---
 
@@ -449,6 +450,8 @@ async function loadChatHistory(chatId) {
 }
 
 async function createNewChat() {
+    if (isCreatingChat) return null;
+    isCreatingChat = true;
     try {
         const res = await fetch(`${baseURL}/chats/new`, { method: 'POST', ...fetchOptions });
         if (res.status === 401) { window.location.reload(); return null; }
@@ -462,12 +465,14 @@ async function createNewChat() {
         addMessageToUI("Hello! How can I help you today?", "bot");
 
         // Refresh sidebar to show the new (empty) chat
-        loadSidebarChats();
+        await loadSidebarChats();
 
-        return data.chat_id; // Return so sendMessage can use it
+        return data.chat_id;
     } catch (e) {
         console.error("Failed to create new chat", e);
         return null;
+    } finally {
+        isCreatingChat = false;
     }
 }
 
@@ -675,14 +680,29 @@ if (messageInput) {
 // --- STARTUP PAGE LOGIC ---
 if (startChatBtn && startupPage && mainLayout) {
     startChatBtn.addEventListener('click', async () => {
+        startChatBtn.disabled = true; // Prevent double clicks
+        
         startupPage.style.opacity = '0';
         startupPage.style.transition = 'opacity 0.5s ease';
         
-        await createNewChat();
+        // First, load existing chats
+        await loadSidebarChats();
+        
+        // If there are NO chats, create one. Otherwise, just show the layout.
+        if (chatList.children.length === 0) {
+            await createNewChat();
+        } else {
+            // Load the most recent chat if none is active
+            if (!currentChatId) {
+                const firstChat = chatList.querySelector('.chat-item');
+                if (firstChat) firstChat.click();
+            }
+        }
         
         setTimeout(() => {
             startupPage.style.display = 'none';
             mainLayout.style.display = 'flex';
+            startChatBtn.disabled = false;
         }, 500);
     });
 }
