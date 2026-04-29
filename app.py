@@ -121,6 +121,41 @@ def require_api_key(f):
     return decorated
 
 # ========================
+# SESSION HELPERS
+# ========================
+def auto_guest_session(f):
+    """If no session exists, automatically create a guest user so the app works without login."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        db = get_db()
+        cursor = db.cursor()
+        
+        # If user_id exists in session, verify they still exist in the DB (Vercel resets DB often)
+        user_exists = False
+        if 'user_id' in session:
+            cursor.execute("SELECT id FROM users WHERE id = %s", (session['user_id'],))
+            if cursor.fetchone():
+                user_exists = True
+        
+        if not user_exists:
+            cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (%s, %s, TRUE) RETURNING id", 
+                           (f"guest_{secrets.token_hex(4)}@local", "guest"))
+            session['user_id'] = cursor.fetchone()['id']
+            db.commit()
+            session.permanent = True
+            
+        return f(*args, **kwargs)
+    return decorated
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return jsonify({"error": "Login required."}), 401
+        return f(*args, **kwargs)
+    return decorated
+
+# ========================
 # TRAFFIC MONITORING
 # ========================
 _request_log = {}
@@ -490,30 +525,7 @@ def manage_persona():
 # CHAT ROUTES
 # ========================
 
-def auto_guest_session(f):
-    """If no session exists, automatically create a guest user so the app works without login."""
-    @wraps(f)
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        db = get_db()
-        cursor = db.cursor()
-        
-        # If user_id exists in session, verify they still exist in the DB (Vercel resets DB often)
-        user_exists = False
-        if 'user_id' in session:
-            cursor.execute("SELECT id FROM users WHERE id = %s", (session['user_id'],))
-            if cursor.fetchone():
-                user_exists = True
-        
-        if not user_exists:
-            cursor.execute("INSERT INTO users (email, password_hash, is_verified) VALUES (%s, %s, TRUE) RETURNING id", 
-                           (f"guest_{secrets.token_hex(4)}@local", "guest"))
-            session['user_id'] = cursor.fetchone()['id']
-            db.commit()
-            session.permanent = True
-            
-        return f(*args, **kwargs)
-    return decorated
+
 
 def get_chat_or_404(chat_id):
     """Return the chat row only if it belongs to the current session user."""
