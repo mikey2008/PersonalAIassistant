@@ -92,9 +92,16 @@
                         <option value="Samay">Samay (Roast & Dark Humor)</option>
                         <option value="Custom">Custom...</option>
                     </select>
-                    <div id="custom-persona-box" style="display: none; margin-top: 10px;">
-                        <textarea id="custom-persona-desc" class="auth-input" placeholder="Describe the personality..." style="height: 60px; font-size: 12px; margin-bottom: 5px; background-color: var(--bg-input); resize: none;"></textarea>
-                        <button id="save-custom-persona-btn" class="start-btn auth-btn" style="padding: 5px; font-size: 11px; margin-top: 0;">Save Description</button>
+                    <div id="custom-persona-box" style="display: none; margin-top: 10px; border: 1px solid var(--border-color); padding: 10px; border-radius: var(--radius-sm); background-color: rgba(255,255,255,0.02);">
+                        <input type="text" id="custom-persona-name" class="auth-input" placeholder="Personality Name (e.g. Samay)" style="font-size: 12px; padding: 8px; margin-bottom: 8px; background-color: var(--bg-input);">
+                        <textarea id="custom-persona-desc" class="auth-input" placeholder="Describe the personality traits..." style="height: 60px; font-size: 12px; margin-bottom: 8px; background-color: var(--bg-input); resize: none;"></textarea>
+                        
+                        <div style="margin-bottom: 10px;">
+                            <label for="custom-avatar-input" style="font-size: 10px; color: var(--text-secondary); display: block; margin-bottom: 4px;">UPLOAD AVATAR (PNG/JPG)</label>
+                            <input type="file" id="custom-avatar-input" accept="image/*" style="font-size: 10px; color: var(--text-secondary); width: 100%;">
+                        </div>
+
+                        <button id="save-custom-persona-btn" class="start-btn auth-btn" style="padding: 8px; font-size: 11px; margin-top: 0; width: 100%;">Save Identity</button>
                     </div>
                 </div>
                 <button id="clear-all-btn" class="clear-all-btn">
@@ -110,7 +117,7 @@
                 <button id="toggle-sidebar-btn" class="icon-btn toggle-sidebar-btn" aria-label="Toggle Sidebar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                 </button>
-                <h1>AI Assistant</h1>
+                <h1 id="app-header-title">AI Assistant</h1>
                 <button id="logout-btn" class="icon-btn" aria-label="Logout" style="margin-left: auto;">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
                 </button>

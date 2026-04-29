@@ -27,7 +27,13 @@ const clearAllBtn = document.getElementById('clear-all-btn');
 const personaSelect = document.getElementById('persona-select');
 const customPersonaBox = document.getElementById('custom-persona-box');
 const customPersonaDesc = document.getElementById('custom-persona-desc');
+const customPersonaName = document.getElementById('custom-persona-name');
+const customAvatarInput = document.getElementById('custom-avatar-input');
 const saveCustomPersonaBtn = document.getElementById('save-custom-persona-btn');
+const appHeaderTitle = document.getElementById('app-header-title');
+
+let currentBotName = "AI Assistant";
+let currentBotAvatar = "baymax.png";
 
 const authHeaders = {
     'Content-Type': 'application/json',
@@ -219,10 +225,24 @@ async function loadPersona() {
             personaSelect.value = data.persona;
             if (data.persona === 'Custom') {
                 customPersonaBox.style.display = 'block';
+                if (data.custom_name) {
+                    currentBotName = data.custom_name;
+                    appHeaderTitle.textContent = currentBotName;
+                }
+                if (data.avatar_data) {
+                    currentBotAvatar = data.avatar_data;
+                }
+            } else {
+                currentBotName = data.persona === 'Friendly Assistant' ? 'AI Assistant' : data.persona;
+                appHeaderTitle.textContent = currentBotName;
+                currentBotAvatar = "baymax.png";
             }
         }
         if (data.custom_description) {
             customPersonaDesc.value = data.custom_description;
+        }
+        if (data.custom_name) {
+            customPersonaName.value = data.custom_name;
         }
     } catch (e) {
         console.error("Load persona failed", e);
@@ -234,8 +254,15 @@ if (personaSelect) {
         const newPersona = personaSelect.value;
         if (newPersona === 'Custom') {
             customPersonaBox.style.display = 'block';
+            if (customPersonaName.value) {
+                currentBotName = customPersonaName.value;
+                appHeaderTitle.textContent = currentBotName;
+            }
         } else {
             customPersonaBox.style.display = 'none';
+            currentBotName = newPersona === 'Friendly Assistant' ? 'AI Assistant' : newPersona;
+            appHeaderTitle.textContent = currentBotName;
+            currentBotAvatar = "baymax.png";
         }
         
         try {
@@ -253,19 +280,52 @@ if (personaSelect) {
 if (saveCustomPersonaBtn) {
     saveCustomPersonaBtn.addEventListener('click', async () => {
         const desc = customPersonaDesc.value;
+        const name = customPersonaName.value;
+        const file = customAvatarInput.files[0];
+        
         saveCustomPersonaBtn.textContent = 'Saving...';
+        
+        let avatarBase64 = null;
+        if (file) {
+            avatarBase64 = await toBase64(file);
+        }
+
         try {
+            const body = { 
+                custom_description: desc,
+                custom_name: name
+            };
+            if (avatarBase64) body.avatar_data = avatarBase64;
+
             await fetch(`${baseURL}/persona`, {
                 method: 'POST',
                 ...fetchOptions,
-                body: JSON.stringify({ custom_description: desc })
+                body: JSON.stringify(body)
             });
-            saveCustomPersonaBtn.textContent = 'Saved!';
-            setTimeout(() => { saveCustomPersonaBtn.textContent = 'Save Description'; }, 2000);
+            
+            if (name) {
+                currentBotName = name;
+                appHeaderTitle.textContent = currentBotName;
+            }
+            if (avatarBase64) {
+                currentBotAvatar = avatarBase64;
+            }
+
+            saveCustomPersonaBtn.textContent = 'Saved Identity!';
+            setTimeout(() => { saveCustomPersonaBtn.textContent = 'Save Identity'; }, 2000);
         } catch (e) {
             console.error("Save custom persona failed", e);
             saveCustomPersonaBtn.textContent = 'Error';
         }
+    });
+}
+
+function toBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
     });
 }
 
@@ -479,7 +539,7 @@ function addMessageToUI(text, sender) {
     
     let innerHTML = '';
     if (sender === 'bot') {
-        innerHTML += '<div class="avatar"><img src="baymax.png" alt="Bot Avatar"></div>';
+        innerHTML += `<div class="avatar"><img src="${currentBotAvatar}" alt="Bot Avatar"></div>`;
     }
     innerHTML += `<div class="message-content">${escapeHTML(text)}</div>`;
     
