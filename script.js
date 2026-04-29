@@ -236,8 +236,7 @@ async function loadSidebarChats() {
             `;
             
             // Handle clicking the chat item (load history)
-            li.querySelector('.chat-title').onclick = (e) => {
-                e.stopPropagation();
+            li.onclick = () => {
                 loadChatHistory(chat.id);
             };
             
@@ -298,6 +297,13 @@ async function loadChatHistory(chatId) {
         const data = await res.json();
         if (!res.ok) {
             console.error("Load history error:", data.error);
+            if (res.status === 404) {
+                // If chat not found, reset currentChatId and refresh sidebar
+                currentChatId = null;
+                chatBox.innerHTML = '';
+                addMessageToUI("Hello! How can I help you today?", "bot");
+                loadSidebarChats();
+            }
             return;
         }
         const messages = Array.isArray(data) ? data : [];

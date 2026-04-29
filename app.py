@@ -479,7 +479,8 @@ def delete_chat(chat_id):
         return jsonify({"error": "Chat not found."}), 404
 
     db = get_db()
-    db.execute("DELETE FROM chats WHERE id = %s", (chat_id,))
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM chats WHERE id = %s", (chat_id,))
     db.commit()
     return jsonify({"success": True, "deleted_chat_id": chat_id})
 
@@ -488,7 +489,8 @@ def delete_chat(chat_id):
 @auto_guest_session
 def clear_all_chats():
     db = get_db()
-    db.execute("DELETE FROM chats WHERE user_id = %s", (session['user_id'],))
+    cursor = db.cursor()
+    cursor.execute("DELETE FROM chats WHERE user_id = %s", (session['user_id'],))
     db.commit()
     return jsonify({"success": True, "message": "All chats cleared."})
 
