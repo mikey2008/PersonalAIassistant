@@ -3,5 +3,5 @@ import { injectSpeedInsights } from './node_modules/@vercel/speed-insights/dist/
 
 // Inject Vercel Speed Insights script
 injectSpeedInsights({
-  // Automatically detect environment (production/development)
+  debug: false // Set to true to enable debug logging in development
 });
