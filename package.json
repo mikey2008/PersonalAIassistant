@@ -1,0 +1,13 @@
+{
+  "name": "personal-ai-assistant",
+  "version": "1.0.0",
+  "description": "Personal AI Assistant with Vercel Web Analytics",
+  "private": true,
+  "scripts": {
+    "build": "echo 'No build step required for Flask app'",
+    "dev": "python app.py"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.4.1"
+  }
+}
